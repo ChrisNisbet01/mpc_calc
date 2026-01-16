@@ -393,8 +393,8 @@ main(int argc, char ** argv)
 
 
         // --- Draw Graph Area ---
-        Rectangle graphRect = {GRAPH_PADDING, GUI_AREA_HEIGHT, 
-                               (float)currentScreenWidth - 2 * GRAPH_PADDING, 
+        Rectangle graphRect = {GRAPH_PADDING, GUI_AREA_HEIGHT,
+                               (float)currentScreenWidth - 2 * GRAPH_PADDING,
                                (float)currentScreenHeight - GUI_AREA_HEIGHT - GRAPH_PADDING};
 
         DrawRectangleLinesEx(graphRect, 1, BLACK); // Bounding box for the graph area
