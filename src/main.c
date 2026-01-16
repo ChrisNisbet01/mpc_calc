@@ -61,9 +61,9 @@ static float effectiveXRange = 0.0f; // Calculated X-axis range for display
 static float effectiveYRange = 0.0f; // Calculated Y-axis range for display
 
 // Function prototypes
+static void recalculate_graph(void);
 static Vector2 WorldToScreen(Vector2 worldPoint, Rectangle graphRect);
 static Vector2 ScreenToWorld(Vector2 screenPoint, Rectangle graphRect);
-static void recalculate_graph(void);
 
 
 // --- Helper Functions Implementations ---
