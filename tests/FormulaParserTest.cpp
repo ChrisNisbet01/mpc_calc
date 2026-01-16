@@ -90,3 +90,25 @@ TEST(FormulaParser, InvalidSyntax)
 
     CHECK_EQUAL(-1, ret);
 }
+
+TEST(FormulaParser, EvaluateSameFormulaMultipleTimes)
+{
+    char const * formula_str = "x * (x + 2)";
+    Formula * formula = formula_compile(formula_str);
+    CHECK_TRUE(formula != NULL);
+
+    double result = 0.0;
+    int ret = 0;
+
+    /* First evaluation */
+    ret = formula_evaluate(formula, 3.0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(15.0, result, 0.001);
+
+    /* Second evaluation */
+    ret = formula_evaluate(formula, 4.0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(24.0, result, 0.001);
+
+    formula_cleanup(formula);
+}

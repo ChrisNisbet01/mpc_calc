@@ -15,6 +15,101 @@ eval_ast(mpc_ast_t const * const tree, double const x_value);
 
 
 /*
+ * The internal structure for a compiled formula context.
+ * This is intentionally kept hidden from the user in the .c file.
+ */
+struct FormulaContext
+{
+    /* MPC Parsers */
+    mpc_parser_t * Float;
+    mpc_parser_t * Int;
+    mpc_parser_t * Number;
+    mpc_parser_t * Variable;
+    mpc_parser_t * Factor;
+    mpc_parser_t * Term;
+    mpc_parser_t * Expr;
+    mpc_parser_t * Formula;
+
+    /* Parsed AST */
+    mpc_ast_t * ast;
+};
+
+/*
+ * See header file for documentation.
+ */
+Formula *
+formula_compile(char const * const formula)
+{
+    Formula * f = malloc(sizeof(Formula));
+
+    if (NULL == f)
+    {
+        return NULL;
+    }
+
+    /*
+     * Define the grammar for mathematical expressions.
+     */
+    f->Float    = mpc_new("float");
+    f->Int      = mpc_new("int");
+    f->Number   = mpc_new("number");
+    f->Variable = mpc_new("variable");
+    f->Factor   = mpc_new("factor");
+    f->Term     = mpc_new("term");
+    f->Expr     = mpc_new("expr");
+    f->Formula  = mpc_new("formula");
+
+    mpca_lang(MPCA_LANG_DEFAULT,
+        "  float    : /-?[0-9]+\\.[0-9]+/ ;                      "
+        "  int      : /-?[0-9]+/ ;                              "
+        "  number   : <float> | <int> ;                         "
+        "  variable : \"x\" ;                                   "
+        "  factor   : <number> | <variable> | '(' <expr> ')' ;  "
+        "  term     : <factor> (('*' | '/') <factor>)* ;        "
+        "  expr     : <term> (('+' | '-') <term>)* ;            "
+        "  formula  : /^/ <expr> /$/ ;                          ",
+        f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+
+    mpc_result_t parse_result;
+
+    if (mpc_parse("<input>", formula, f->Formula, &parse_result))
+    {
+        f->ast = parse_result.output;
+        return f;
+    }
+    else
+    {
+        mpc_err_print(parse_result.error);
+        mpc_err_delete(parse_result.error);
+        /* Cleanup the parsers before freeing the context */
+        mpc_cleanup(8, f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+        free(f);
+        return NULL;
+    }
+}
+
+/*
+ * See header file for documentation.
+ */
+int
+formula_evaluate(Formula * const f, double const x, double * const result)
+{
+    if (NULL == f)
+    {
+        return -1;
+    }
+
+    double const evaluated_result = eval_ast(f->ast->children[1], x);
+
+    if (NULL != result)
+    {
+        *result = evaluated_result;
+    }
+
+    return 0;
+}
+
+/*
  * @brief Parses and evaluates a mathematical formula.
  *
  * This function takes a formula string (e.g., "x * (x + 2)"), substitutes
@@ -72,7 +167,8 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
     else
     {
         /*
-         * Parsing failed. Print error for debugging.
+         * Parsing failed.
+         * Print error for debugging.
          */
         mpc_err_print(parse_result.error);
         mpc_err_delete(parse_result.error);
