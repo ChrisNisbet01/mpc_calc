@@ -1,0 +1,16 @@
+enable_testing()
+
+set(TEST_SRCS
+    AllTests.cpp
+    DummyTest.cpp
+)
+
+add_executable(mpc_calc_tests ${TEST_SRCS})
+
+# Link to the targets created by CppUTest's CMakeLists.txt
+target_link_libraries(mpc_calc_tests PRIVATE CppUTest CppUTestExt)
+
+add_test(
+    NAME RunMpcCalcTests
+    COMMAND mpc_calc_tests
+)
