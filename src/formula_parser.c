@@ -54,15 +54,15 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
 
     if (mpc_parse("<input>", formula, Formula, &parse_result))
     {
-        mpc_ast_print(parse_result.output); /* Debugging line to print AST */
-        double const evaluated_result = eval_ast(parse_result.output, x);
+        mpc_ast_t * const ast = parse_result.output;
+        double const evaluated_result = eval_ast(ast->children[1], x);
 
         if (NULL != result)
         {
             *result = evaluated_result;
         }
 
-        mpc_ast_delete(parse_result.output);
+        mpc_ast_delete(ast);
         ret_code = 0; /* Success */
     }
     else
