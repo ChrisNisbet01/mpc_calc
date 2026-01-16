@@ -30,9 +30,11 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
 {
     /*
      * Define the grammar for mathematical expressions.
-     * Supported: numbers (doubles), variable 'x', +, -, *, /, and parentheses.
-     * Precedence: *, / > +, -.
+     * To handle PEG parser behavior, we define float and int separately
+     * and try to match the more specific 'float' rule first.
      */
+    mpc_parser_t * Float    = mpc_new("float");
+    mpc_parser_t * Int      = mpc_new("int");
     mpc_parser_t * Number   = mpc_new("number");
     mpc_parser_t * Variable = mpc_new("variable");
     mpc_parser_t * Factor   = mpc_new("factor");
@@ -41,13 +43,15 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
     mpc_parser_t * Formula  = mpc_new("formula");
 
     mpca_lang(MPCA_LANG_DEFAULT,
-        "  number   : /-?[0-9]+(\\\\.[0-9]+)?/ ;                  "
+        "  float    : /-?[0-9]+\\.[0-9]+/ ;                      "
+        "  int      : /-?[0-9]+/ ;                              "
+        "  number   : <float> | <int> ;                         "
         "  variable : \"x\" ;                                   "
         "  factor   : <number> | <variable> | '(' <expr> ')' ;  "
         "  term     : <factor> (('*' | '/') <factor>)* ;        "
         "  expr     : <term> (('+' | '-') <term>)* ;            "
         "  formula  : /^/ <expr> /$/ ;                          ",
-        Number, Variable, Factor, Term, Expr, Formula);
+        Float, Int, Number, Variable, Factor, Term, Expr, Formula);
 
     mpc_result_t parse_result;
     int          ret_code = -1; /* Assume failure */
@@ -69,13 +73,12 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
     {
         /*
          * Parsing failed. Print error for debugging.
-         * In a production system, this might be logged or returned in a more structured way.
          */
         mpc_err_print(parse_result.error);
         mpc_err_delete(parse_result.error);
     }
 
-    mpc_cleanup(6, Number, Variable, Factor, Term, Expr, Formula);
+    mpc_cleanup(8, Float, Int, Number, Variable, Factor, Term, Expr, Formula);
 
     return ret_code;
 }
@@ -95,31 +98,34 @@ static double
 eval_ast(mpc_ast_t const * const tree, double const x_value)
 {
     /*
-     * If the current node is a number, convert its contents to a double.
-     * Check for explicit tag "number".
+     * If the node is a number (float or int), it is a terminal leaf. Return its value.
      */
-    if (0 != strstr(tree->tag, "number"))
+    if ((0 != strstr(tree->tag, "float")) || (0 != strstr(tree->tag, "int")))
     {
         return atof(tree->contents);
     }
-
-    /*
-     * If the current node is a variable 'x', return its value.
-     * Check for explicit tag "variable".
-     */
     if (0 != strstr(tree->tag, "variable"))
     {
         return x_value;
     }
 
     /*
-     * The node must be an expression (expr) or a term.
-     * The first child is always the first operand.
+     * If the expression is wrapped in parentheses, e.g., "(<expr>)", its value is
+     * the evaluation of the inner expression, which is the second child.
+     */
+    if (0 == strcmp(tree->children[0]->contents, "("))
+    {
+        return eval_ast(tree->children[1], x_value);
+    }
+
+    /*
+     * Otherwise, it's an operator expression. Evaluate the first child as the
+     * starting value.
      */
     double left_operand = eval_ast(tree->children[0], x_value);
 
     /*
-     * Iterate over the remaining children. They come in pairs: operator and operand.
+     * Iterate over the remaining children, which come in (operator, operand) pairs.
      */
     for (int i = 1; i < tree->children_num; i += 2)
     {
@@ -145,7 +151,6 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         {
             /*
              * Basic division by zero check.
-             * A more robust solution might handle this as an error.
              */
             if (0.0 == right_operand)
             {
