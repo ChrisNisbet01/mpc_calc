@@ -1,45 +1,53 @@
+#include "formula_parser.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "mpc/mpc.h"
 
-int main(int argc, char** argv) {
-  /* Create Some Parsers */
-  mpc_parser_t* number   = mpc_new("number");
-  mpc_parser_t* operator = mpc_new("operator");
-  mpc_parser_t* expr     = mpc_new("expr");
-  mpc_parser_t* lispy    = mpc_new("lispy");
+int
+main(int argc, char ** argv)
+{
+    char const * formula_str = "x * x + 2 * x + 1";
+    Formula * formula = NULL;
+    double result = 0.0;
+    int ret = 0;
 
-  /* Define them with a string */
-  mpca_lang(MPCA_LANG_DEFAULT,
-    "                                                     \
-      number   : /-?[0-9]+/ ;                             \
-      operator : '+' | '-' | '*' | '/' ;                  \
-      expr     : <number> | '(' <operator> <expr>+ ')' ;  \
-      lispy    : /^/ <operator> <expr>+ /$/ ;             \
-    ",
-    number, operator, expr, lispy);
+    printf("Compiling formula: \"%s\"\n", formula_str);
+    formula = formula_compile(formula_str);
 
-  puts("MPC Calculator");
-  puts("Press Ctrl+c to Exit\n");
+    if (NULL == formula)
+    {
+        fprintf(stderr, "Failed to compile formula.\n");
+        return -1;
+    }
 
-  /* Print Version and Exit Information */
-  puts("Lispy Version 0.0.0.0.1");
+    /* Evaluate with x = 2.0 */
+    double const x1 = 2.0;
 
-  if (argc > 1) {
-      mpc_result_t r;
-      if (mpc_parse("<stdin>", argv[1], lispy, &r)) {
-          mpc_ast_print(r.output);
-          mpc_ast_delete(r.output);
-      } else {
-          mpc_err_print(r.error);
-          mpc_err_delete(r.error);
-      }
-  } else {
-      puts("Usage: mpc_calc_app \"<expression>\"");
-  }
+    ret = formula_evaluate(formula, x1, &result);
+    if (0 == ret)
+    {
+        printf("Result for x = %.2f: %.2f\n", x1, result);
+    }
+    else
+    {
+        fprintf(stderr, "Failed to evaluate formula for x = %.2f\n", x1);
+    }
 
-  /* Undefine and Delete our Parsers */
-  mpc_cleanup(4, number, operator, expr, lispy);
+    /* Evaluate with x = 3.0 */
+    double const x2 = 3.0;
 
-  return 0;
+    ret = formula_evaluate(formula, x2, &result);
+    if (0 == ret)
+    {
+        printf("Result for x = %.2f: %.2f\n", x2, result);
+    }
+    else
+    {
+        fprintf(stderr, "Failed to evaluate formula for x = %.2f\n", x2);
+    }
+
+    /* Clean up */
+    formula_cleanup(formula);
+
+    return 0;
 }

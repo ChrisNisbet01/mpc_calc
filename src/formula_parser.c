@@ -110,73 +110,38 @@ formula_evaluate(Formula * const f, double const x, double * const result)
 }
 
 /*
- * @brief Parses and evaluates a mathematical formula.
- *
- * This function takes a formula string (e.g., "x * (x + 2)"), substitutes
- * the value for 'x', and computes the result.
- *
- * @param formula The mathematical formula to evaluate.
- * @param x The value to substitute for the variable 'x'.
- * @param result A pointer to a double where the result will be stored.
- * @return 0 on success, a non-zero value on parsing or evaluation error.
+ * See header file for documentation.
+ */
+void
+formula_cleanup(Formula * f)
+{
+    if (NULL == f)
+    {
+        return;
+    }
+
+    mpc_ast_delete(f->ast);
+    mpc_cleanup(8, f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+    free(f);
+}
+
+/*
+ * See header file for documentation.
  */
 int
 parse_and_evaluate(char const * const formula, double const x, double * const result)
 {
-    /*
-     * Define the grammar for mathematical expressions.
-     * To handle PEG parser behavior, we define float and int separately
-     * and try to match the more specific 'float' rule first.
-     */
-    mpc_parser_t * Float    = mpc_new("float");
-    mpc_parser_t * Int      = mpc_new("int");
-    mpc_parser_t * Number   = mpc_new("number");
-    mpc_parser_t * Variable = mpc_new("variable");
-    mpc_parser_t * Factor   = mpc_new("factor");
-    mpc_parser_t * Term     = mpc_new("term");
-    mpc_parser_t * Expr     = mpc_new("expr");
-    mpc_parser_t * Formula  = mpc_new("formula");
+    Formula * const f = formula_compile(formula);
 
-    mpca_lang(MPCA_LANG_DEFAULT,
-        "  float    : /-?[0-9]+\\.[0-9]+/ ;                      "
-        "  int      : /-?[0-9]+/ ;                              "
-        "  number   : <float> | <int> ;                         "
-        "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' ;  "
-        "  term     : <factor> (('*' | '/') <factor>)* ;        "
-        "  expr     : <term> (('+' | '-') <term>)* ;            "
-        "  formula  : /^/ <expr> /$/ ;                          ",
-        Float, Int, Number, Variable, Factor, Term, Expr, Formula);
-
-    mpc_result_t parse_result;
-    int          ret_code = -1; /* Assume failure */
-
-    if (mpc_parse("<input>", formula, Formula, &parse_result))
+    if (NULL == f)
     {
-        mpc_ast_t * const ast = parse_result.output;
-        double const evaluated_result = eval_ast(ast->children[1], x);
-
-        if (NULL != result)
-        {
-            *result = evaluated_result;
-        }
-
-        mpc_ast_delete(ast);
-        ret_code = 0; /* Success */
-    }
-    else
-    {
-        /*
-         * Parsing failed.
-         * Print error for debugging.
-         */
-        mpc_err_print(parse_result.error);
-        mpc_err_delete(parse_result.error);
+        return -1;
     }
 
-    mpc_cleanup(8, Float, Int, Number, Variable, Factor, Term, Expr, Formula);
+    int const ret = formula_evaluate(f, x, result);
 
-    return ret_code;
+    formula_cleanup(f);
+    return ret;
 }
 
 
