@@ -31,6 +31,14 @@ add_custom_target(build_mpc
 set(MPC_LIBRARY ${mpc_SOURCE_DIR}/build/libmpc.a)
 set(MPC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/include)
 
+# --- Fetch and build raylib library ---
+FetchContent_Declare(
+  raylib
+  GIT_REPOSITORY https://github.com/raysan5/raylib.git
+  GIT_TAG        master # Or a specific tag like 5.0 for a stable release
+)
+FetchContent_MakeAvailable(raylib)
+
 # --- Source code ---
 add_subdirectory(src)
 
