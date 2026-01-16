@@ -6,6 +6,9 @@
 
 #include "raylib.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h" // Include raygui header
+
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 450
 #define MAX_TEXT_LENGTH 128
@@ -65,6 +68,8 @@ main(int argc, char ** argv)
     /* Initialize RayLib window */
     InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "MPC Calculator Results");
     SetTargetFPS(60);
+    // GuiEnable(); // Not needed, enabled by default
+    GuiSetStyle(DEFAULT, TEXT_SIZE, 20); // Set a default text size for GUI elements
 
     /* Main game loop */
     while (!WindowShouldClose())
@@ -76,6 +81,13 @@ main(int argc, char ** argv)
         DrawText(compile_status_buffer, 50, 50, 20, DARKGRAY);
         DrawText(text_buffer1, 50, 100, 20, DARKBLUE);
         DrawText(text_buffer2, 50, 130, 20, DARKGREEN);
+
+        // Placeholder RayGUI button to confirm integration
+        if (GuiButton((Rectangle){50, 200, 100, 30}, "Test Button"))
+        {
+            // Do something when button is pressed, or just confirm it renders
+        }
+
         DrawText("Press ESC to close", 50, SCREEN_HEIGHT - 50, 20, LIGHTGRAY);
 
         EndDrawing();

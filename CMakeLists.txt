@@ -39,6 +39,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib)
 
+# --- Fetch and build raygui library ---
+FetchContent_Declare(
+  raygui
+  GIT_REPOSITORY https://github.com/raysan5/raygui.git
+  GIT_TAG        master # Or a specific tag like 3.5 for a stable release
+)
+FetchContent_MakeAvailable(raygui)
+
 # --- Source code ---
 add_subdirectory(src)
 
