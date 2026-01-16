@@ -136,3 +136,47 @@ TEST(FormulaParser, SineFunction)
     CHECK_EQUAL(0, ret);
     DOUBLES_EQUAL(0.0, result, 0.001);
 }
+
+TEST(FormulaParser, TangentFunction)
+{
+    char const * formula = "tan(0)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(0.0, result, 0.001);
+}
+
+TEST(FormulaParser, PowerFunction)
+{
+    char const * formula = "pow(2, 3)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(8.0, result, 0.001);
+}
+
+TEST(FormulaParser, LogFunction)
+{
+    char const * formula = "log(1)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(0.0, result, 0.001);
+}
+
+TEST(FormulaParser, Log10Function)
+{
+    char const * formula = "log10(10)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(1.0, result, 0.001);
+}

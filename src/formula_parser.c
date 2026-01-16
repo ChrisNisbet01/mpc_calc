@@ -65,7 +65,7 @@ formula_compile(char const * const formula)
         "  int      : /-?[0-9]+/ ;                              "
         "  number   : <float> | <int> ;                         "
         "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' ;  "
+        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' | \"tan\" '(' <expr> ')' | \"pow\" '(' <expr> ',' <expr> ')' | \"log10\" '(' <expr> ')' | \"log\" '(' <expr> ')' ;  "
         "  term     : <factor> (('*' | '/') <factor>)* ;        "
         "  expr     : <term> (('+' | '-') <term>)* ;            "
         "  formula  : /^/ <expr> /$/ ;                          ",
@@ -75,6 +75,7 @@ formula_compile(char const * const formula)
 
     if (mpc_parse("<input>", formula, f->Formula, &parse_result))
     {
+        mpc_ast_print(parse_result.output); /* Debugging line to print AST */
         f->ast = parse_result.output;
         return f;
     }
@@ -195,6 +196,35 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         /* The argument is the third child (index 2) */
         double const arg = eval_ast(tree->children[2], x_value);
         return sin(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "tan"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return tan(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "pow"))
+    {
+        /* The arguments are at index 2 and 4 */
+        double const arg1 = eval_ast(tree->children[2], x_value);
+        double const arg2 = eval_ast(tree->children[4], x_value);
+        return pow(arg1, arg2);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "log"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return log(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "log10"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return log10(arg);
     }
 
     /*
