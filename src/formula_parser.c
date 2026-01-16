@@ -65,7 +65,7 @@ formula_compile(char const * const formula)
         "  int      : /-?[0-9]+/ ;                              "
         "  number   : <float> | <int> ;                         "
         "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' ;  "
+        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' ;  "
         "  term     : <factor> (('*' | '/') <factor>)* ;        "
         "  expr     : <term> (('+' | '-') <term>)* ;            "
         "  formula  : /^/ <expr> /$/ ;                          ",
@@ -188,6 +188,13 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         /* The argument is the third child (index 2) */
         double const arg = eval_ast(tree->children[2], x_value);
         return cos(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "sin"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return sin(arg);
     }
 
     /*
