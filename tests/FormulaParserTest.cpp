@@ -1,5 +1,7 @@
 #include "CppUTest/TestHarness.h"
 
+#include <math.h>
+
 extern "C"
 {
 #include "formula_parser.h"
@@ -111,4 +113,26 @@ TEST(FormulaParser, EvaluateSameFormulaMultipleTimes)
     DOUBLES_EQUAL(24.0, result, 0.001);
 
     formula_cleanup(formula);
+}
+
+TEST(FormulaParser, CosineFunction)
+{
+    char const * formula = "cos(0)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(1.0, result, 0.001);
+}
+
+TEST(FormulaParser, SineFunction)
+{
+    char const * formula = "sin(0)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(0.0, result, 0.001);
 }

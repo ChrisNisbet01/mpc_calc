@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.14)
 project(mpc_calc C)
 
+include(CTest)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ".so") # Prioritize static libraries

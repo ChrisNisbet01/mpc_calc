@@ -2,9 +2,10 @@
 
 #include "mpc/mpc.h"
 
+#include <math.h>
 #include <stdio.h>
-#include <stdlib.h> /* For atof */
-#include <string.h> /* For strcmp */
+#include <stdlib.h>
+#include <string.h>
 
 
 /*
@@ -64,7 +65,7 @@ formula_compile(char const * const formula)
         "  int      : /-?[0-9]+/ ;                              "
         "  number   : <float> | <int> ;                         "
         "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' ;  "
+        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' ;  "
         "  term     : <factor> (('*' | '/') <factor>)* ;        "
         "  expr     : <term> (('+' | '-') <term>)* ;            "
         "  formula  : /^/ <expr> /$/ ;                          ",
@@ -177,6 +178,16 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
     if (0 == strcmp(tree->children[0]->contents, "("))
     {
         return eval_ast(tree->children[1], x_value);
+    }
+
+    /*
+     * Check if the node is a function call, like "cos(<expr>)".
+     */
+    if (0 == strcmp(tree->children[0]->contents, "cos"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return cos(arg);
     }
 
     /*

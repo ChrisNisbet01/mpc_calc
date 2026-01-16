@@ -7,5 +7,5 @@ target_link_libraries(mpc_calc_app PRIVATE ${MPC_LIBRARY} formula_parser_lib)
 add_library(formula_parser_lib STATIC formula_parser.c)
 target_include_directories(formula_parser_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 add_dependencies(formula_parser_lib build_mpc)
-target_link_libraries(formula_parser_lib PRIVATE ${MPC_LIBRARY})
+target_link_libraries(formula_parser_lib PRIVATE ${MPC_LIBRARY} m)
 target_include_directories(formula_parser_lib PRIVATE ${MPC_INCLUDE_DIR}) # mpc.h is needed by parser
