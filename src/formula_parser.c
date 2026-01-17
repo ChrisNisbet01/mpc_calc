@@ -47,6 +47,10 @@ eval_error_to_string(EvalError error)
             return "Division by zero";
         case EVAL_ERROR_UNKNOWN_CONSTANT:
             return "Unknown constant";
+        case EVAL_ERROR_UNKNOWN_OPERATION:
+            return "Unknown operation";
+        case EVAL_ERROR_NULL_FORMULA:
+            return "NULL formula";
         case EVAL_ERROR_UNKNOWN:
         default:
             return "Unknown error";
@@ -118,7 +122,7 @@ formula_evaluate(Formula * const f, double const x)
 {
     if (NULL == f)
     {
-        return (EvalResult){.value = 0.0, .error = EVAL_ERROR_UNKNOWN};
+        return (EvalResult){.error = EVAL_ERROR_NULL_FORMULA};
     }
 
     return eval_ast(f->ast->children[1], x);
@@ -206,7 +210,7 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         }
         else
         {
-            return (EvalResult){.value = 0.0, .error = EVAL_ERROR_UNKNOWN_CONSTANT};
+            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT};
         }
     }
 
@@ -372,10 +376,14 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
              */
             if (0.0 == right_operand)
             {
-                return (EvalResult){.value = 0.0, .error = EVAL_ERROR_DIVISION_BY_ZERO};
+                return (EvalResult){.error = EVAL_ERROR_DIVISION_BY_ZERO};
             }
 
             left_operand /= right_operand;
+        }
+        else
+        {
+            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION };
         }
     }
 
