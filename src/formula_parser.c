@@ -66,7 +66,7 @@ formula_compile(char const * const formula)
         "  int      : /-?[0-9]+/ ;                              "
         "  number   : <float> | <int> ;                         "
         "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' | \"tan\" '(' <expr> ')' | \"pow\" '(' <expr> ',' <expr> ')' | \"log10\" '(' <expr> ')' | \"log\" '(' <expr> ')' ;  "
+        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' | \"tan\" '(' <expr> ')' | \"asin\" '(' <expr> ')' | \"acos\" '(' <expr> ')' | \"atan\" '(' <expr> ')' | \"pow\" '(' <expr> ',' <expr> ')' | \"log10\" '(' <expr> ')' | \"log\" '(' <expr> ')' ;  "
         "  term     : <factor> (('*' | '/') <factor>)* ;        "
         "  expr     : <term> (('+' | '-') <term>)* ;            "
         "  formula  : /^/ <expr> /$/ ;                          ",
@@ -205,6 +205,27 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         /* The argument is the third child (index 2) */
         double const arg = eval_ast(tree->children[2], x_value);
         return tan(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "asin"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return asin(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "acos"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return acos(arg);
+    }
+
+    if (0 == strcmp(tree->children[0]->contents, "atan"))
+    {
+        /* The argument is the third child (index 2) */
+        double const arg = eval_ast(tree->children[2], x_value);
+        return atan(arg);
     }
 
     if (0 == strcmp(tree->children[0]->contents, "pow"))

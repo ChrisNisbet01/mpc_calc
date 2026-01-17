@@ -180,3 +180,37 @@ TEST(FormulaParser, Log10Function)
     CHECK_EQUAL(0, ret);
     DOUBLES_EQUAL(1.0, result, 0.001);
 }
+
+TEST(FormulaParser, ASinFunction)
+{
+    char const * formula = "asin(0.5)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(M_PI / 6.0, result, 0.001);
+}
+
+TEST(FormulaParser, ACosFunction)
+{
+    char const * formula = "acos(0.0)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(M_PI / 2.0, result, 0.001);
+}
+
+TEST(FormulaParser, ATanFunction)
+{
+    char const * formula = "atan(1.0)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(M_PI / 4.0, result, 0.001);
+}
+

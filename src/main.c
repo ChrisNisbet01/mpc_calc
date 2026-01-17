@@ -372,8 +372,6 @@ main(int argc, char ** argv)
                                (float)currentScreenWidth - 2 * GRAPH_PADDING,
                                (float)currentScreenHeight - GUI_AREA_HEIGHT - GRAPH_PADDING};
 
-        DrawRectangleLinesEx(graphRect, 1, BLACK); // Bounding box for the graph area
-
         // Draw X and Y axes
         Vector2 originWorld = {0.0f, 0.0f};
         Vector2 originScreen = WorldToScreen(originWorld, graphRect);
@@ -393,10 +391,14 @@ main(int argc, char ** argv)
             for (float p = ceilf(log_xmin); p <= floorf(log_xmax); ++p)
             {
                 float x_major = powf(10, p);
+
                 if (x_major >= xminVal && x_major <= xmaxVal)
                 {
                     Vector2 screenPos = WorldToScreen((Vector2){x_major, 0.0f}, graphRect);
-                    DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, BLACK);
+                    DrawLine(screenPos.x,
+                             graphRect.y,
+                             screenPos.x,
+                             graphRect.y + graphRect.height, LIGHTGRAY);
                     DrawText(TextFormat("10^%.0f", p), screenPos.x - MeasureText(TextFormat("10^%.0f", p), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
                 }
 
@@ -409,7 +411,7 @@ main(int argc, char ** argv)
                         if (x_minor >= xminVal && x_minor <= xmaxVal)
                         {
                             Vector2 screenPos = WorldToScreen((Vector2){x_minor, 0.0f}, graphRect);
-                            DrawLine(screenPos.x, originScreen.y - 3, screenPos.x, originScreen.y + 3, LIGHTGRAY);
+                            DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, LIGHTGRAY);
                         }
                     }
                 }
@@ -423,7 +425,10 @@ main(int argc, char ** argv)
                 if (fabsf(x) < 1e-6) continue; // Skip label for 0.0 to avoid overlap
 
                 Vector2 screenPos = WorldToScreen((Vector2){x, 0.0f}, graphRect);
-                DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, BLACK);
+                DrawLine(screenPos.x,
+                         graphRect.y,
+                         screenPos.x,
+                         graphRect.y + graphRect.height, LIGHTGRAY);
                 DrawText(TextFormat("%.1f", x), screenPos.x - MeasureText(TextFormat("%.1f", x), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
             }
         }
@@ -435,7 +440,7 @@ main(int argc, char ** argv)
             if (fabsf(y) < 1e-6) continue; // Skip label for 0.0 to avoid overlap
 
             Vector2 screenPos = WorldToScreen((Vector2){0.0f, y}, graphRect);
-            DrawLine(originScreen.x - 5, screenPos.y, originScreen.x + 5, screenPos.y, BLACK);
+            DrawLine(graphRect.x, screenPos.y, graphRect.x + graphRect.width, screenPos.y, LIGHTGRAY);
             DrawText(TextFormat("%.1f", y), originScreen.x + 5 + AXIS_LABEL_PADDING, screenPos.y - FONT_SIZE/4, FONT_SIZE/2, DARKGRAY);
         }
 
