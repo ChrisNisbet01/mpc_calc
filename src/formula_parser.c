@@ -26,6 +26,7 @@ struct FormulaContext
     mpc_parser_t * Int;
     mpc_parser_t * Number;
     mpc_parser_t * Variable;
+    mpc_parser_t * Constant;
     mpc_parser_t * Factor;
     mpc_parser_t * Term;
     mpc_parser_t * Expr;
@@ -52,25 +53,27 @@ formula_compile(char const * const formula)
     /*
      * Define the grammar for mathematical expressions.
      */
-    f->Float    = mpc_new("float");
-    f->Int      = mpc_new("int");
-    f->Number   = mpc_new("number");
-    f->Variable = mpc_new("variable");
-    f->Factor   = mpc_new("factor");
-    f->Term     = mpc_new("term");
-    f->Expr     = mpc_new("expr");
-    f->Formula  = mpc_new("formula");
+    f->Float     = mpc_new("float");
+    f->Int       = mpc_new("int");
+    f->Number    = mpc_new("number");
+    f->Variable  = mpc_new("variable");
+    f->Constant  = mpc_new("constant");
+    f->Factor    = mpc_new("factor");
+    f->Term      = mpc_new("term");
+    f->Expr      = mpc_new("expr");
+    f->Formula   = mpc_new("formula");
 
     mpca_lang(MPCA_LANG_DEFAULT,
-        "  float    : /-?[0-9]+\\.[0-9]+/ ;                      "
-        "  int      : /-?[0-9]+/ ;                              "
-        "  number   : <float> | <int> ;                         "
-        "  variable : \"x\" ;                                   "
-        "  factor   : <number> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' | \"tan\" '(' <expr> ')' | \"asin\" '(' <expr> ')' | \"acos\" '(' <expr> ')' | \"atan\" '(' <expr> ')' | \"pow\" '(' <expr> ',' <expr> ')' | \"log10\" '(' <expr> ')' | \"log\" '(' <expr> ')' ;  "
-        "  term     : <factor> (('*' | '/') <factor>)* ;        "
-        "  expr     : <term> (('+' | '-') <term>)* ;            "
-        "  formula  : /^/ <expr> /$/ ;                          ",
-        f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+        "  float    : /-?[0-9]+\\.[0-9]+/ ;                                                                                                                                    "
+        "  int      : /-?[0-9]+/ ;                                                                                                                                            "
+        "  number   : <float> | <int> ;                                                                                                                                       "
+        "  variable : \"x\" ;                                                                                                                                                 "
+        "  constant : \"pi\" | \"e\" ;                                                                                                                                        "
+        "  factor   : <number> | <constant> | <variable> | '(' <expr> ')' | \"cos\" '(' <expr> ')' | \"sin\" '(' <expr> ')' | \"tan\" '(' <expr> ')' | \"asin\" '(' <expr> ')' | \"acos\" '(' <expr> ')' | \"atan\" '(' <expr> ')' | \"pow\" '(' <expr> ',' <expr> ')' | \"log10\" '(' <expr> ')' | \"log\" '(' <expr> ')' ;  "
+        "  term     : <factor> (('*' | '/') <factor>)* ;                                                                                                                       "
+        "  expr     : <term> (('+' | '-') <term>)* ;                                                                                                                          "
+        "  formula  : /^/ <expr> /$/ ;                                                                                                                                        ",
+        f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
 
     mpc_result_t parse_result;
 
@@ -85,7 +88,7 @@ formula_compile(char const * const formula)
         mpc_err_print(parse_result.error);
         mpc_err_delete(parse_result.error);
         /* Cleanup the parsers before freeing the context */
-        mpc_cleanup(8, f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+        mpc_cleanup(9, f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
         free(f);
         return NULL;
     }
@@ -124,7 +127,7 @@ formula_cleanup(Formula * f)
     }
 
     mpc_ast_delete(f->ast);
-    mpc_cleanup(8, f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+    mpc_cleanup(9, f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
     free(f->error_msg);
     free(f);
 }
@@ -172,6 +175,17 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
     if (0 != strstr(tree->tag, "variable"))
     {
         return x_value;
+    }
+    if (0 != strstr(tree->tag, "constant"))
+    {
+        if (strcmp(tree->contents, "pi") == 0)
+        {
+            return M_PI;
+        }
+        else if (strcmp(tree->contents, "e") == 0)
+        {
+            return M_E;
+        }
     }
 
     /*

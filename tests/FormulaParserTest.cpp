@@ -214,3 +214,36 @@ TEST(FormulaParser, ATanFunction)
     DOUBLES_EQUAL(M_PI / 4.0, result, 0.001);
 }
 
+TEST(FormulaParser, PiConstant)
+{
+    char const * formula = "pi";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(M_PI, result, 0.001);
+}
+
+TEST(FormulaParser, EConstant)
+{
+    char const * formula = "e";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(M_E, result, 0.001);
+}
+
+TEST(FormulaParser, ComplexFormulaWithConstants)
+{
+    char const * formula = "sin(pi/2) + log(e)";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(2.0, result, 0.001);
+}
+
