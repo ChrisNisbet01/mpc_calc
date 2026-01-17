@@ -73,3 +73,4 @@ formula_cleanup(Formula * f);
  */
 int
 parse_and_evaluate(char const * formula, double x, double * result);
+
