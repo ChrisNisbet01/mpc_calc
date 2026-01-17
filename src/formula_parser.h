@@ -6,6 +6,27 @@
 struct FormulaContext;
 typedef struct FormulaContext Formula;
 
+typedef enum {
+    EVAL_ERROR_NONE = 0,
+    EVAL_ERROR_DIVISION_BY_ZERO,
+    EVAL_ERROR_UNKNOWN_CONSTANT,
+    EVAL_ERROR_UNKNOWN
+} EvalError;
+
+typedef struct {
+    double value;
+    EvalError error;
+} EvalResult;
+
+/**
+ * @brief Converts an evaluation error enum to a string.
+ *
+ * @param error The error enum.
+ * @return A string representation of the error.
+ */
+char const *
+eval_error_to_string(EvalError error);
+
 /**
  * @brief "Compiles" a formula string into a reusable context.
  *
@@ -26,8 +47,8 @@ formula_compile(char const * formula);
  * @param result A pointer to a double where the evaluation result will be stored.
  * @return 0 on success, a non-zero value on evaluation error.
  */
-int
-formula_evaluate(Formula * f, double x, double * result);
+EvalResult
+formula_evaluate(Formula * f, double x);
 
 /**
  * @brief Cleans up and frees all resources associated with a Formula context.

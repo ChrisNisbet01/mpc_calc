@@ -11,7 +11,7 @@
 /*
  * Forward declarations for AST evaluation.
  */
-static double
+static EvalResult
 eval_ast(mpc_ast_t const * const tree, double const x_value);
 
 
@@ -35,6 +35,23 @@ struct FormulaContext
     /* Parsed AST */
     mpc_ast_t * ast;
 };
+
+char const *
+eval_error_to_string(EvalError error)
+{
+    switch (error)
+    {
+        case EVAL_ERROR_NONE:
+            return "No error";
+        case EVAL_ERROR_DIVISION_BY_ZERO:
+            return "Division by zero";
+        case EVAL_ERROR_UNKNOWN_CONSTANT:
+            return "Unknown constant";
+        case EVAL_ERROR_UNKNOWN:
+        default:
+            return "Unknown error";
+    }
+}
 
 /*
  * See header file for documentation.
@@ -96,22 +113,15 @@ formula_compile(char const * const formula)
 /*
  * See header file for documentation.
  */
-int
-formula_evaluate(Formula * const f, double const x, double * const result)
+EvalResult
+formula_evaluate(Formula * const f, double const x)
 {
     if (NULL == f)
     {
-        return -1;
+        return (EvalResult){.value = 0.0, .error = EVAL_ERROR_UNKNOWN};
     }
 
-    double const evaluated_result = eval_ast(f->ast->children[1], x);
-
-    if (NULL != result)
-    {
-        *result = evaluated_result;
-    }
-
-    return 0;
+    return eval_ast(f->ast->children[1], x);
 }
 
 /*
@@ -143,10 +153,20 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
         return -1;
     }
 
-    int const ret = formula_evaluate(f, x, result);
+    EvalResult const eval_result = formula_evaluate(f, x);
+    if (eval_result.error != EVAL_ERROR_NONE)
+    {
+        *result = 0.0;
+        return -1;
+    }
+    else
+    {
+        *result = eval_result.value;
+    }
+
 
     formula_cleanup(f);
-    return ret;
+    return 0;
 }
 
 
@@ -160,7 +180,7 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
  * @param x_value The numerical value to substitute for the variable 'x'.
  * @return The calculated numerical result of the AST.
  */
-static double
+static EvalResult
 eval_ast(mpc_ast_t const * const tree, double const x_value)
 {
     /*
@@ -168,21 +188,25 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
      */
     if ((0 != strstr(tree->tag, "float")) || (0 != strstr(tree->tag, "int")))
     {
-        return atof(tree->contents);
+        return (EvalResult){.value = atof(tree->contents), .error = EVAL_ERROR_NONE};
     }
     if (0 != strstr(tree->tag, "variable"))
     {
-        return x_value;
+        return (EvalResult){.value = x_value, .error = EVAL_ERROR_NONE};
     }
     if (0 != strstr(tree->tag, "constant"))
     {
         if (strcmp(tree->contents, "pi") == 0)
         {
-            return M_PI;
+            return (EvalResult){.value = M_PI, .error = EVAL_ERROR_NONE};
         }
         else if (strcmp(tree->contents, "e") == 0)
         {
-            return M_E;
+            return (EvalResult){.value = M_E, .error = EVAL_ERROR_NONE};
+        }
+        else
+        {
+            return (EvalResult){.value = 0.0, .error = EVAL_ERROR_UNKNOWN_CONSTANT};
         }
     }
 
@@ -201,72 +225,117 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
     if (0 == strcmp(tree->children[0]->contents, "cos"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return cos(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = cos(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "sin"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return sin(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = sin(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "tan"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return tan(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = tan(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "asin"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return asin(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = asin(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "acos"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return acos(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = acos(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "atan"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return atan(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = atan(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "pow"))
     {
         /* The arguments are at index 2 and 4 */
-        double const arg1 = eval_ast(tree->children[2], x_value);
-        double const arg2 = eval_ast(tree->children[4], x_value);
-        return pow(arg1, arg2);
+        EvalResult const arg1 = eval_ast(tree->children[2], x_value);
+        if (arg1.error != EVAL_ERROR_NONE)
+        {
+            return arg1;
+        }
+        EvalResult const arg2 = eval_ast(tree->children[4], x_value);
+        if (arg2.error != EVAL_ERROR_NONE)
+        {
+            return arg2;
+        }
+        return (EvalResult){.value = pow(arg1.value, arg2.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "log"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return log(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = log(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     if (0 == strcmp(tree->children[0]->contents, "log10"))
     {
         /* The argument is the third child (index 2) */
-        double const arg = eval_ast(tree->children[2], x_value);
-        return log10(arg);
+        EvalResult const arg = eval_ast(tree->children[2], x_value);
+        if (arg.error != EVAL_ERROR_NONE)
+        {
+            return arg;
+        }
+        return (EvalResult){.value = log10(arg.value), .error = EVAL_ERROR_NONE};
     }
 
     /*
      * Otherwise, it's an operator expression. Evaluate the first child as the
      * starting value.
      */
-    double left_operand = eval_ast(tree->children[0], x_value);
+    EvalResult left_operand_res = eval_ast(tree->children[0], x_value);
+    if (left_operand_res.error != EVAL_ERROR_NONE)
+    {
+        return left_operand_res;
+    }
+    double left_operand = left_operand_res.value;
 
     /*
      * Iterate over the remaining children, which come in (operator, operand) pairs.
@@ -277,7 +346,12 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
         mpc_ast_t const * const right_operand_node = tree->children[i + 1];
 
         char const * const op = operator_node->contents;
-        double const right_operand = eval_ast(right_operand_node, x_value);
+        EvalResult const right_operand_res = eval_ast(right_operand_node, x_value);
+        if (right_operand_res.error != EVAL_ERROR_NONE)
+        {
+            return right_operand_res;
+        }
+        double const right_operand = right_operand_res.value;
 
         if (0 == strcmp(op, "+"))
         {
@@ -298,13 +372,12 @@ eval_ast(mpc_ast_t const * const tree, double const x_value)
              */
             if (0.0 == right_operand)
             {
-                fprintf(stderr, "Error: Division by zero\n");
-                return 0.0; /* Or some error indicator like NAN */
+                return (EvalResult){.value = 0.0, .error = EVAL_ERROR_DIVISION_BY_ZERO};
             }
 
             left_operand /= right_operand;
         }
     }
 
-    return left_operand;
+    return (EvalResult){.value = left_operand, .error = EVAL_ERROR_NONE};
 }

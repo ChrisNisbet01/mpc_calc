@@ -134,12 +134,13 @@ recalculate_graph(void)
             break;
         }
 
-        double y_double;
-        int eval_res = formula_evaluate(compiledFormula, current_x, &y_double);
-        if (eval_res != 0)
+        EvalResult eval_res = formula_evaluate(compiledFormula, current_x);
+        if (eval_res.error != EVAL_ERROR_NONE)
         {
+            snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error evaluating formula: %s", eval_error_to_string(eval_res.error));
             continue;
         }
+        double y_double = eval_res.value;
 
         float y = y_double;
 
@@ -248,6 +249,9 @@ main(int argc, char ** argv)
     InitWindow(INITIAL_SCREEN_WIDTH, INITIAL_SCREEN_HEIGHT, "Function Plotter");
     SetTargetFPS(60);
     GuiSetStyle(DEFAULT, TEXT_SIZE, FONT_SIZE); // Use FONT_SIZE here
+
+    Font font = LoadFont("fonts/iosevka-regular.ttf");
+    GuiSetFont(font);
 
     // Initial parsing of default formula
     recalculate_graph(); // Use the new function
@@ -364,7 +368,7 @@ main(int argc, char ** argv)
         }
 
         // Compile status message
-        DrawText(compileStatusBuffer, GRAPH_PADDING, currentY + INPUT_FIELD_HEIGHT + SPACING, FONT_SIZE, compileStatusBuffer[0] == 'E' ? RED : DARKGRAY);
+        DrawTextEx(font, compileStatusBuffer, (Vector2){GRAPH_PADDING, currentY + INPUT_FIELD_HEIGHT + SPACING}, FONT_SIZE, 1, compileStatusBuffer[0] == 'E' ? RED : DARKGRAY);
 
 
         // --- Draw Graph Area ---
@@ -399,7 +403,7 @@ main(int argc, char ** argv)
                              graphRect.y,
                              screenPos.x,
                              graphRect.y + graphRect.height, LIGHTGRAY);
-                    DrawText(TextFormat("10^%.0f", p), screenPos.x - MeasureText(TextFormat("10^%.0f", p), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
+                    DrawTextEx(font, TextFormat("10^%.0f", p), (Vector2){screenPos.x - MeasureText(TextFormat("10^%.0f", p), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING}, FONT_SIZE/2, 1, DARKGRAY);
                 }
 
                 // Minor ticks within each decade
@@ -429,7 +433,7 @@ main(int argc, char ** argv)
                          graphRect.y,
                          screenPos.x,
                          graphRect.y + graphRect.height, LIGHTGRAY);
-                DrawText(TextFormat("%.1f", x), screenPos.x - MeasureText(TextFormat("%.1f", x), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
+                DrawTextEx(font, TextFormat("%.1f", x), (Vector2){screenPos.x - MeasureText(TextFormat("%.1f", x), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING}, FONT_SIZE/2, 1, DARKGRAY);
             }
         }
 
@@ -441,7 +445,7 @@ main(int argc, char ** argv)
 
             Vector2 screenPos = WorldToScreen((Vector2){0.0f, y}, graphRect);
             DrawLine(graphRect.x, screenPos.y, graphRect.x + graphRect.width, screenPos.y, LIGHTGRAY);
-            DrawText(TextFormat("%.1f", y), originScreen.x + 5 + AXIS_LABEL_PADDING, screenPos.y - FONT_SIZE/4, FONT_SIZE/2, DARKGRAY);
+            DrawTextEx(font, TextFormat("%.1f", y), (Vector2){originScreen.x + 5 + AXIS_LABEL_PADDING, screenPos.y - FONT_SIZE/4}, FONT_SIZE/2, 1, DARKGRAY);
         }
 
         // Draw the function graph
@@ -486,6 +490,7 @@ main(int argc, char ** argv)
         MemFree(graphPoints);
         graphPoints = NULL;
     }
+    UnloadFont(font);
     CloseWindow();
 
     return 0;

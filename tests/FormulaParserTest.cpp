@@ -99,21 +99,29 @@ TEST(FormulaParser, EvaluateSameFormulaMultipleTimes)
     Formula * formula = formula_compile(formula_str);
     CHECK_TRUE(formula != NULL);
 
-    double result = 0.0;
-    int ret = 0;
-
     /* First evaluation */
-    ret = formula_evaluate(formula, 3.0, &result);
-    CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(15.0, result, 0.001);
+    EvalResult result1 = formula_evaluate(formula, 3.0);
+    CHECK_EQUAL(EVAL_ERROR_NONE, result1.error);
+    DOUBLES_EQUAL(15.0, result1.value, 0.001);
 
     /* Second evaluation */
-    ret = formula_evaluate(formula, 4.0, &result);
-    CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(24.0, result, 0.001);
+    EvalResult result2 = formula_evaluate(formula, 4.0);
+    CHECK_EQUAL(EVAL_ERROR_NONE, result2.error);
+    DOUBLES_EQUAL(24.0, result2.value, 0.001);
 
     formula_cleanup(formula);
 }
+
+TEST(FormulaParser, DivisionByZero)
+{
+    char const * formula = "1/0";
+    double x = 0.0;
+    double result = 0.0;
+    int const ret = parse_and_evaluate(formula, x, &result);
+
+    CHECK_EQUAL(-1, ret);
+}
+
 
 TEST(FormulaParser, CosineFunction)
 {
