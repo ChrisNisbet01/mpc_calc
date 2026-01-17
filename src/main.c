@@ -48,6 +48,9 @@ static bool stepEditMode = false;
 static char formulaInputText[MAX_FORMULA_CHARS] = "x*x";
 static bool formulaEditMode = false;
 
+static bool logXScale = false; // New: Logarithmic X-axis scale state
+static bool prevLogXScale = false; // New: Previous state of logXScale for change detection
+
 static bool drawGraphPressed = false;
 
 #define MAX_GRAPH_POINTS 10000 // Maximum number of points to allocate initially
@@ -90,9 +93,8 @@ recalculate_graph(void)
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error compiling formula '%s'", formulaInputText);
         return;
     }
-    snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled. Plotting...", formulaInputText);
+    snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
 
-    // Calculate effective ranges for axes based on user input for centering at 0,0
     effectiveXRange = xmaxVal - xminVal;
     effectiveYRange = ymaxVal - yminVal;
 
@@ -106,50 +108,79 @@ recalculate_graph(void)
 
     // Generate graph points
     int estimatedPoints = (int)(effectiveXRange / stepVal) + 1;
-    if (estimatedPoints > 0)
+
+    graphPointsCount = 0;
+    graphPoints = MemAlloc(estimatedPoints * sizeof(*graphPoints));
+    if (NULL == graphPoints)
     {
-        graphPoints = (Vector2 *)MemAlloc(estimatedPoints * sizeof(Vector2));
-        if (NULL == graphPoints)
+        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory for graph points.");
+        formula_cleanup(compiledFormula);
+        compiledFormula = NULL;
+        return;
+    }
+
+    for (int i = 0; i < estimatedPoints; ++i)
+    {
+        float current_x;
+
+        current_x = xminVal + (float)i * stepVal;
+        // Ensure x is positive for logarithmic calculations downstream
+        if (logXScale && current_x <= 0.f)
         {
-            snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory for graph points.");
-            formula_cleanup(compiledFormula);
-            compiledFormula = NULL;
-            return;
+            continue;
+        }
+        if (current_x > xmaxVal)
+        {
+            break;
         }
 
-        float x = xminVal;
-        for (int i = 0; x <= xmaxVal; ++i)
+        double y_double;
+        int eval_res = formula_evaluate(compiledFormula, current_x, &y_double);
+        if (eval_res != 0)
         {
-            double y_double;
-            formula_evaluate(compiledFormula, x, &y_double);
-            float y = (float)y_double;
+            continue;
+        }
 
-            if (!isinf(y) && !isnan(y) && y >= yminVal && y <= ymaxVal)
+        float y = y_double;
+
+        if (isinf(y))
+        {
+            continue;
+        }
+        if (isnan(y))
+        {
+            continue;
+        }
+        if (y < yminVal)
+        {
+            continue;
+        }
+        if (y > ymaxVal)
+        {
+            continue;
+        }
+
+        // Dynamically reallocate if needed, in chunks
+        if (graphPointsCount == estimatedPoints)
+        {
+            estimatedPoints *= 2; // Double the capacity
+            Vector2 *newGraphPoints = MemRealloc(graphPoints, estimatedPoints * sizeof(*newGraphPoints));
+            if (NULL == newGraphPoints)
             {
-                graphPoints[graphPointsCount].x = x;
-                graphPoints[graphPointsCount].y = y;
-                graphPointsCount++;
-
-                // Dynamically reallocate if needed, in chunks
-                if (graphPointsCount == estimatedPoints)
-                {
-                    estimatedPoints *= 2; // Double the capacity
-                    Vector2 *newGraphPoints = (Vector2 *)MemRealloc(graphPoints, estimatedPoints * sizeof(Vector2));
-                    if (NULL == newGraphPoints)
-                    {
-                        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory during reallocation.");
-                        formula_cleanup(compiledFormula);
-                        compiledFormula = NULL;
-                        MemFree(graphPoints);
-                        graphPoints = NULL;
-                        graphPointsCount = 0;
-                        return;
-                    }
-                    graphPoints = newGraphPoints;
-                }
+                snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory during reallocation.");
+                formula_cleanup(compiledFormula);
+                compiledFormula = NULL;
+                MemFree(graphPoints);
+                graphPoints = NULL;
+                graphPointsCount = 0;
+                return;
             }
-            x += stepVal;
+            graphPoints = newGraphPoints;
         }
+
+        graphPoints[graphPointsCount].x = current_x;
+        graphPoints[graphPointsCount].y = y;
+        graphPointsCount++;
     }
 
     if (graphPointsCount == 0)
@@ -165,11 +196,30 @@ WorldToScreen(Vector2 worldPoint, Rectangle graphRect)
 {
     Vector2 screenPoint = {0};
     // Calculate the scale factor for X and Y axes
-    float scaleX = graphRect.width / (xmaxVal - xminVal);
-    float scaleY = graphRect.height / (ymaxVal - yminVal);
+    float scaleX, scaleY;
 
-    // Translate and scale the world point
-    screenPoint.x = graphRect.x + (worldPoint.x - xminVal) * scaleX;
+    if (logXScale)
+    {
+        // Ensure log inputs are positive
+        float log_xmin = (xminVal > 0) ? log10f(xminVal) : log10f(0.0001f); // Clamp to a small positive value if xminVal is not positive
+        float log_xmax = (xmaxVal > 0) ? log10f(xmaxVal) : log10f(1.0f); // Clamp to a small positive value if xmaxVal is not positive
+
+        // Effective range in log space
+        float log_effectiveXRange = log_xmax - log_xmin;
+        scaleX = graphRect.width / log_effectiveXRange;
+
+        // Transform worldPoint.x to log space
+        float transformed_world_x = (worldPoint.x > 0) ? log10f(worldPoint.x) : log10f(0.0001f);
+
+        screenPoint.x = graphRect.x + (transformed_world_x - log_xmin) * scaleX;
+    }
+    else
+    {
+        scaleX = graphRect.width / (xmaxVal - xminVal);
+        screenPoint.x = graphRect.x + (worldPoint.x - xminVal) * scaleX;
+    }
+
+    scaleY = graphRect.height / (ymaxVal - yminVal);
     screenPoint.y = graphRect.y + graphRect.height - (worldPoint.y - yminVal) * scaleY; // Y-axis is inverted in screen coordinates
 
     return screenPoint;
@@ -220,91 +270,9 @@ main(int argc, char ** argv)
         // --- GUI Controls ---
         int currentScreenWidth = GetScreenWidth();
         int currentScreenHeight = GetScreenHeight();
-
         // Define common layout parameters
         float currentX = GRAPH_PADDING;
         float currentY = GRAPH_PADDING;
-
-        // XMIN input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "xmin:");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT}, xminText, MAX_INPUT_CHARS, xminEditMode))
-        {
-            xminEditMode = !xminEditMode;
-            if (!xminEditMode) xminVal = (float)atof(xminText); // Parse value when editing ends
-        }
-        currentX += INPUT_FIELD_WIDTH + SPACING;
-
-        // XMAX input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "xmax:");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT}, xmaxText, MAX_INPUT_CHARS, xmaxEditMode))
-        {
-            xmaxEditMode = !xmaxEditMode;
-            if (!xmaxEditMode) xmaxVal = (float)atof(xmaxText);
-        }
-        currentX += INPUT_FIELD_WIDTH + SPACING;
-
-        // YMIN input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "ymin:");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT}, yminText, MAX_INPUT_CHARS, yminEditMode))
-        {
-            yminEditMode = !yminEditMode;
-            if (!yminEditMode) yminVal = (float)atof(yminText);
-        }
-        currentX += INPUT_FIELD_WIDTH + SPACING;
-
-        // YMAX input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "ymax:");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT}, ymaxText, MAX_INPUT_CHARS, ymaxEditMode))
-        {
-            ymaxEditMode = !ymaxEditMode;
-            if (!ymaxEditMode) ymaxVal = (float)atof(ymaxText);
-        }
-        currentX += INPUT_FIELD_WIDTH + SPACING;
-
-        currentX = GRAPH_PADDING; // Reset X for next row
-        currentY += INPUT_FIELD_HEIGHT + SPACING; // Move to next row
-
-        // STEP input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "step:");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, INPUT_FIELD_WIDTH, INPUT_FIELD_HEIGHT}, stepText, MAX_INPUT_CHARS, stepEditMode))
-        {
-            stepEditMode = !stepEditMode;
-            if (!stepEditMode)
-            {
-                stepVal = (float)atof(stepText);
-                if (stepVal <= 0.0f) stepVal = 0.01f; // Ensure step is positive
-                snprintf(stepText, MAX_INPUT_CHARS, "%.3f", stepVal); // Update text if changed
-            }
-        }
-        currentX += INPUT_FIELD_WIDTH + SPACING;
-
-        // Formula input
-        GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "f(x):");
-        currentX += LABEL_WIDTH;
-        if (GuiTextBox((Rectangle){currentX, currentY, currentScreenWidth - currentX - GRAPH_PADDING - (BUTTON_WIDTH + SPACING), INPUT_FIELD_HEIGHT}, formulaInputText, MAX_FORMULA_CHARS, formulaEditMode))
-        {
-            formulaEditMode = !formulaEditMode;
-        }
-
-        // Draw Graph button
-        currentX = currentScreenWidth - GRAPH_PADDING - BUTTON_WIDTH;
-        if (GuiButton((Rectangle){currentX, currentY, BUTTON_WIDTH, BUTTON_HEIGHT}, "Draw Graph"))
-        {
-            drawGraphPressed = true;
-        }
-
-        // Recalculate graph if button pressed or editing mode changed (for value parsing)
-        if (drawGraphPressed || !xminEditMode || !xmaxEditMode || !yminEditMode || !ymaxEditMode || !stepEditMode || !formulaEditMode)
-        {
-            recalculate_graph();
-            drawGraphPressed = false; // Reset button state
-        }
-
 
         // Draw
         BeginDrawing();
@@ -312,8 +280,6 @@ main(int argc, char ** argv)
         ClearBackground(RAYWHITE);
 
         // --- Draw GUI Elements ---
-        currentX = GRAPH_PADDING;
-        currentY = GRAPH_PADDING;
 
         // XMIN input
         GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "xmin:");
@@ -372,6 +338,15 @@ main(int argc, char ** argv)
             }
         }
         currentX += INPUT_FIELD_WIDTH + SPACING;
+
+        // Log X Scale checkbox
+        if (GuiCheckBox((Rectangle){currentX, currentY, INPUT_FIELD_HEIGHT, INPUT_FIELD_HEIGHT}, "Log X Scale", &logXScale))
+        {
+            //logXScale = !logXScale;
+            drawGraphPressed = true; // Trigger recalculation
+        }
+        currentX = GRAPH_PADDING; // Reset X for next row
+        currentY += INPUT_FIELD_HEIGHT + SPACING; // Move to next row
 
         // Formula input
         GuiLabel((Rectangle){currentX, currentY, LABEL_WIDTH, INPUT_FIELD_HEIGHT}, "f(x):");
@@ -403,18 +378,54 @@ main(int argc, char ** argv)
         Vector2 originWorld = {0.0f, 0.0f};
         Vector2 originScreen = WorldToScreen(originWorld, graphRect);
 
-        DrawLine(graphRect.x, originScreen.y, graphRect.x + graphRect.width, originScreen.y, BLACK); // X-axis
-        DrawLine(originScreen.x, graphRect.y, originScreen.x, graphRect.y + graphRect.height, BLACK); // Y-axis
+        // Draw X-axis
+        DrawLine(graphRect.x, originScreen.y, graphRect.x + graphRect.width, originScreen.y, BLACK);
+
+        // Draw Y-axis
+        DrawLine(originScreen.x, graphRect.y, originScreen.x, graphRect.y + graphRect.height, BLACK);
 
         // Draw X-axis ticks and labels
-        float xStep = effectiveXRange / 10.0f; // 10 major ticks
-        for (float x = xminVal; x <= xmaxVal; x += xStep)
+        if (logXScale)
         {
-            if (fabsf(x) < 1e-6) continue; // Skip label for 0.0 to avoid overlap
+            float log_xmin = log10f(fmaxf(xminVal, 0.0001f)); // Ensure positive for log
+            float log_xmax = log10f(fmaxf(xmaxVal, 0.0001f)); // Ensure positive for log
 
-            Vector2 screenPos = WorldToScreen((Vector2){x, 0.0f}, graphRect);
-            DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, BLACK);
-            DrawText(TextFormat("%.1f", x), screenPos.x - MeasureText(TextFormat("%.1f", x), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
+            for (float p = ceilf(log_xmin); p <= floorf(log_xmax); ++p)
+            {
+                float x_major = powf(10, p);
+                if (x_major >= xminVal && x_major <= xmaxVal)
+                {
+                    Vector2 screenPos = WorldToScreen((Vector2){x_major, 0.0f}, graphRect);
+                    DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, BLACK);
+                    DrawText(TextFormat("10^%.0f", p), screenPos.x - MeasureText(TextFormat("10^%.0f", p), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
+                }
+
+                // Minor ticks within each decade
+                if (p < floorf(log_xmax)) // Don't draw minor ticks beyond the last major
+                {
+                    for (int i = 2; i < 10; ++i)
+                    {
+                        float x_minor = i * powf(10, p);
+                        if (x_minor >= xminVal && x_minor <= xmaxVal)
+                        {
+                            Vector2 screenPos = WorldToScreen((Vector2){x_minor, 0.0f}, graphRect);
+                            DrawLine(screenPos.x, originScreen.y - 3, screenPos.x, originScreen.y + 3, LIGHTGRAY);
+                        }
+                    }
+                }
+            }
+        }
+        else // Linear X-axis
+        {
+            float xStep = effectiveXRange / 10.0f; // 10 major ticks
+            for (float x = xminVal; x <= xmaxVal; x += xStep)
+            {
+                if (fabsf(x) < 1e-6) continue; // Skip label for 0.0 to avoid overlap
+
+                Vector2 screenPos = WorldToScreen((Vector2){x, 0.0f}, graphRect);
+                DrawLine(screenPos.x, originScreen.y - 5, screenPos.x, originScreen.y + 5, BLACK);
+                DrawText(TextFormat("%.1f", x), screenPos.x - MeasureText(TextFormat("%.1f", x), FONT_SIZE/2) / 2, originScreen.y + 5 + AXIS_LABEL_PADDING, FONT_SIZE/2, DARKGRAY);
+            }
         }
 
         // Draw Y-axis ticks and labels
@@ -437,6 +448,23 @@ main(int argc, char ** argv)
                 Vector2 screenPoint2 = WorldToScreen(graphPoints[i+1], graphRect);
                 DrawLineV(screenPoint1, screenPoint2, BLUE);
             }
+        }
+
+        // Recalculate graph if button pressed or editing mode changed (for value parsing)
+        bool const should_recalculate_graph = drawGraphPressed
+            || !xminEditMode
+            || !xmaxEditMode
+            || !yminEditMode
+            || !ymaxEditMode
+            || !stepEditMode
+            || !formulaEditMode
+            || (logXScale != prevLogXScale);
+
+        if (should_recalculate_graph)
+        {
+            recalculate_graph();
+            drawGraphPressed = false; // Reset button state
+            prevLogXScale = logXScale; // Update previous state
         }
 
         EndDrawing();

@@ -33,6 +33,7 @@ struct FormulaContext
 
     /* Parsed AST */
     mpc_ast_t * ast;
+    char * error_msg;
 };
 
 /*
@@ -41,7 +42,7 @@ struct FormulaContext
 Formula *
 formula_compile(char const * const formula)
 {
-    Formula * f = malloc(sizeof(Formula));
+    Formula * f = calloc(1, sizeof(*f));
 
     if (NULL == f)
     {
@@ -75,7 +76,7 @@ formula_compile(char const * const formula)
 
     if (mpc_parse("<input>", formula, f->Formula, &parse_result))
     {
-        mpc_ast_print(parse_result.output); /* Debugging line to print AST */
+        //mpc_ast_print(parse_result.output); /* Debugging line to print AST */
         f->ast = parse_result.output;
         return f;
     }
@@ -124,6 +125,7 @@ formula_cleanup(Formula * f)
 
     mpc_ast_delete(f->ast);
     mpc_cleanup(8, f->Float, f->Int, f->Number, f->Variable, f->Factor, f->Term, f->Expr, f->Formula);
+    free(f->error_msg);
     free(f);
 }
 
