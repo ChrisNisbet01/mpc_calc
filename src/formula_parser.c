@@ -34,7 +34,6 @@ struct FormulaContext
 
     /* Parsed AST */
     mpc_ast_t * ast;
-    char * error_msg;
 };
 
 /*
@@ -128,7 +127,6 @@ formula_cleanup(Formula * f)
 
     mpc_ast_delete(f->ast);
     mpc_cleanup(9, f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
-    free(f->error_msg);
     free(f);
 }
 
