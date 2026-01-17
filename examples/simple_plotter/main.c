@@ -1,4 +1,4 @@
-#include "formula_parser.h"
+#include <formula_parser.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -250,15 +250,8 @@ main(int argc, char ** argv)
     SetTargetFPS(60);
     GuiSetStyle(DEFAULT, TEXT_SIZE, FONT_SIZE); // Use FONT_SIZE here
 
-    Font font = {0};
-
-    if (argc > 1)
-    {
-        char const * const font_path = argv[1];
-        font = LoadFont(font_path);
-
-        GuiSetFont(font);
-    }
+    Font font = LoadFont("fonts/iosevka-regular.ttf");
+    GuiSetFont(font);
 
     // Initial parsing of default formula
     recalculate_graph(); // Use the new function

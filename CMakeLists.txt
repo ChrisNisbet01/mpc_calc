@@ -1,54 +1,13 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.16)
 project(mpc_calc C)
 
 include(CTest)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
-set(CMAKE_FIND_LIBRARY_SUFFIXES ".a" ".so") # Prioritize static libraries
 
-# --- Fetch and build mpc library ---
-include(FetchContent)
-
-FetchContent_Declare(
-  mpc
-  GIT_REPOSITORY https://github.com/orangeduck/mpc.git
-  GIT_TAG        master
-)
-FetchContent_MakeAvailable(mpc)
-
-
-# Build mpc using its Makefile
-add_custom_target(build_mpc
-    COMMAND ${CMAKE_COMMAND} -E chdir ${mpc_SOURCE_DIR} make clean
-    COMMAND ${CMAKE_COMMAND} -E chdir ${mpc_SOURCE_DIR} make libs
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/mpc
-    COMMAND ${CMAKE_COMMAND} -E copy ${mpc_SOURCE_DIR}/mpc.h ${CMAKE_BINARY_DIR}/include/mpc/mpc.h
-    BYPRODUCTS ${mpc_SOURCE_DIR}/build/libmpc.a
-    COMMENT "Building mpc library and copying headers"
-)
-
-set(MPC_LIBRARY ${mpc_SOURCE_DIR}/build/libmpc.a)
-set(MPC_INCLUDE_DIR ${CMAKE_BINARY_DIR}/include)
-
-# --- Fetch and build raylib library ---
-FetchContent_Declare(
-  raylib
-  GIT_REPOSITORY https://github.com/raysan5/raylib.git
-  GIT_TAG        master # Or a specific tag like 5.0 for a stable release
-)
-FetchContent_MakeAvailable(raylib)
-
-# --- Fetch and build raygui library ---
-FetchContent_Declare(
-  raygui
-  GIT_REPOSITORY https://github.com/raysan5/raygui.git
-  GIT_TAG        master # Or a specific tag like 3.5 for a stable release
-)
-FetchContent_MakeAvailable(raygui)
-
-# --- Source code ---
-add_subdirectory(src)
+add_subdirectory(lib)
+add_subdirectory(examples)
 
 # --- Unit Tests ---
 option(WITH_UNIT_TESTS "Build unit tests" OFF)
