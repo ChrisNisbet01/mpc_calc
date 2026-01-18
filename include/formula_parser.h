@@ -1,10 +1,22 @@
 #pragma once
 
+#include <stdbool.h>
+#include <string.h>
+#include <stdlib.h> // For size_t
+#include "mpc/mpc.h"
+
+// --- Custom AST Definitions (Opaque) ---
+struct FormulaAST;
+typedef struct FormulaAST FormulaAST;
+// --- End Custom AST Definitions ---
+
 /*
  * Opaque pointer to the internal formula context structure.
  */
 struct FormulaContext;
 typedef struct FormulaContext Formula;
+
+void formula_ast_destroy(FormulaAST *ast);
 
 typedef enum {
     EVAL_ERROR_NONE = 0,
