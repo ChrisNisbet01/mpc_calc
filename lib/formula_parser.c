@@ -501,29 +501,20 @@ formula_compile(char const * const formula)
     // Define individual parsers using mpc_* combinators and our custom callbacks
 
     // Numbers
-    mpc_define(f->Float, mpc_apply((mpc_apply_t)mpc_make_number, mpc_re("-?[0-9]+\\.[0-9]+")));
-    mpc_define(f->Int, mpc_apply((mpc_apply_t)mpc_make_number, mpc_re("-?[0-9]+")));
+    mpc_define(f->Float, mpc_apply(mpc_re("-?[0-9]+\\.[0-9]+"), (mpc_apply_t)mpc_make_number));
+    mpc_define(f->Int, mpc_apply(mpc_re("-?[0-9]+"), (mpc_apply_t)mpc_make_number));
     mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
 
     // Variable
-    mpc_define(f->Variable, mpc_apply((mpc_apply_t)mpc_make_variable, mpc_string("x")));
+    mpc_define(f->Variable, mpc_apply(mpc_string("x"), (mpc_apply_t)mpc_make_variable));
 
     // Constant (treated as variables for evaluation as per current eval logic)
-    mpc_define(f->Constant, mpc_apply((mpc_apply_t)mpc_make_constant, mpc_or(2, mpc_string("pi"), mpc_string("e"))));
+    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_string("pi"), mpc_string("e")), (mpc_apply_t)mpc_make_constant));
 
     // Factor rules: order matters (longest match first)
-    mpc_define(f->Factor, mpc_or(12, // Increased count due to added function variants
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("log10"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("log"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("acos"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("asin"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("atan"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("cos"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("sin"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_string("tan"), mpc_char('('), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
-        mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_string("pow"), mpc_char('('), mpc_copy(f->Expr), mpc_char(','), mpc_copy(f->Expr), mpc_char(')'), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
+    mpc_define(f->Factor, mpc_or(4,
         mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy), // Parenthesized expression
-        mpc_copy(f->Number),    // Number (must be after functions to avoid partial matches)
+        mpc_copy(f->Number),    // Number
         mpc_copy(f->Constant),  // Constant
         mpc_copy(f->Variable)   // Variable
     ));
@@ -534,7 +525,7 @@ formula_compile(char const * const formula)
     mpc_define(f->Term, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Factor), // The initial factor
         mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_oneof("*/"), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
-        (mpc_dtor_t)formula_ast_destroy // Destructor for initial factor if parsing fails
+        (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
 
@@ -543,14 +534,14 @@ formula_compile(char const * const formula)
     mpc_define(f->Expr, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Term), // The initial term
         mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_oneof("+-"), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
-        (mpc_dtor_t)formula_ast_destroy // Destructor for initial term if parsing fails
+        (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
     // Formula (start and end of input)
     mpc_define(f->Formula, mpc_and(3, mpcf_snd_free, mpc_soi(), mpc_copy(f->Expr), mpc_eoi(), mpcf_dtor_null, (mpc_dtor_t)formula_ast_destroy)); // Keep only the Expr AST
 
 
-    mpc_result_t parse_result;
+    mpc_result_t parse_result = {0};
 
     if (mpc_parse("<input>", formula, f->Formula, &parse_result))
     {
