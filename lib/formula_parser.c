@@ -1,6 +1,6 @@
 #include <formula_parser.h>
 
-#include "mpc/mpc.h"
+#include "mpc.h"
 
 #include <math.h>
 #include <stdbool.h>
