@@ -1,5 +1,8 @@
-#include "CppUTest/TestHarness.h"
-#include "mpc/mpc.h"
+#include <CppUTest/CommandLineTestRunner.h>
+#include <CppUTest/TestHarness.h>
+#include <CppUTest/MemoryLeakDetectorNewMacros.h> // For new/delete leaks
+
+#include "mpc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +10,6 @@
 
 extern "C"
 {
-
 /*
  * A dummy AST structure for demonstration purposes.
  * We don't need a complex AST, just something to represent a parsed result.
@@ -16,14 +18,16 @@ typedef struct {
     char *value;
 } DummyAST;
 
-static mpc_val_t *dummy_ctor(mpc_val_t *val) {
+static mpc_val_t *
+dummy_ctor(mpc_val_t *val) {
     DummyAST *ast = (DummyAST *)malloc(sizeof(DummyAST));
     ast->value = strdup((char *)val);
     free(val);
     return ast;
 }
 
-static void dummy_dtor(mpc_val_t *val) {
+static void
+dummy_dtor(mpc_val_t *val) {
     DummyAST *ast = (DummyAST *)val;
     if (ast) {
         free(ast->value);
@@ -31,26 +35,27 @@ static void dummy_dtor(mpc_val_t *val) {
     }
 }
 
-static mpc_val_t *dummy_fold_str(int n, mpc_val_t **xs) {
-    char *result = (char *)malloc(1);
-    result[0] = '\0';
-    for (int i = 0; i < n; i++) {
-        result = (char *)realloc(result, strlen(result) + strlen((char *)xs[i]) + 1);
-        strcat(result, (char *)xs[i]);
-        free(xs[i]);
-    }
-    return result;
+static mpc_val_t *dummy_fold_str(int n, mpc_val_t **xs)
+{
+    return mpcf_strfold(n, xs);
 }
 
-static mpc_val_t *dummy_fold_ast(int n, mpc_val_t **xs) {
+static mpc_val_t *
+dummy_fold_ast(int n, mpc_val_t **xs)
+{
     DummyAST *ast = (DummyAST *)malloc(sizeof(DummyAST));
     char *result_str = (char *)dummy_fold_str(n, xs);
     ast->value = result_str;
     return ast;
 }
 
-static void dummy_dtor_str(mpc_val_t *val) {
-    free((char *)val);
+static void dummy_dtor_str(mpc_val_t *val)
+{
+    free(val);
+}
+
+static void dummy_dtor_char(mpc_val_t *val)
+{
 }
 
 
@@ -79,10 +84,10 @@ TEST(MpcCopy, UseAfterFreeDemonstration)
     mpc_parser_t *Expr = mpc_new("expr");
 
     // Initial definition for Term: matches a number
-    mpc_define(Term, mpc_apply(mpc_re("[0-9]+"), dummy_ctor));
+    mpc_define(Term, mpc_re("[0-9]+")); // Directly returns char*
 
     // Expr depends on Term
-    mpc_define(Expr, mpc_and(2, dummy_fold_str, Term, mpc_re("[+]"), Term, dummy_dtor_str, dummy_dtor_str));
+    mpc_define(Expr, mpc_and(3, mpcf_strfold, Term, mpc_re("[+]"), Term, dummy_dtor_char, dummy_dtor_char, dummy_dtor_char));
 
     // Try parsing with the initial grammar
     mpc_result_t r;
@@ -94,7 +99,7 @@ TEST(MpcCopy, UseAfterFreeDemonstration)
     // Now, redefine Term WITHOUT mpc_copy(). This will free the internal parser of Term.
     // If Expr is not updated (or if it held a direct pointer), it's now dangling.
     mpc_undefine(Term); // Explicitly undefine to simulate replacement of internal structure
-    mpc_define(Term, mpc_apply(mpc_re("[a-zA-Z]+"), dummy_ctor)); // New definition for Term: matches a letter
+    mpc_define(Term, mpc_re("[a-zA-Z]+")); // New definition for Term: matches a letter
 
     // Attempt to parse with Expr. If Expr still uses the old Term, it might crash or
     // exhibit undefined behavior (use-after-free).
@@ -125,10 +130,10 @@ TEST(MpcCopy, NoUseAfterFreeWithMpcCopy)
     mpc_parser_t *Expr = mpc_new("expr");
 
     // Initial definition for Term: matches a number
-    mpc_define(Term, mpc_apply(mpc_re("[0-9]+"), dummy_ctor));
+    mpc_define(Term, mpc_re("[0-9]+")); // Directly returns char*
 
     // Expr depends on a COPY of Term
-    mpc_define(Expr, mpc_and(2, dummy_fold_str, mpc_copy(Term), mpc_re("[+]"), mpc_copy(Term), dummy_dtor_str, dummy_dtor_str));
+    mpc_define(Expr, mpc_and(3, mpcf_strfold, mpc_copy(Term), mpc_re("[+]"), mpc_copy(Term), dummy_dtor_char, dummy_dtor_char, dummy_dtor_char));
 
     // Try parsing with the initial grammar
     mpc_result_t r;
@@ -139,7 +144,7 @@ TEST(MpcCopy, NoUseAfterFreeWithMpcCopy)
 
     // Now, redefine Term. Expr's copy of Term remains valid.
     mpc_undefine(Term);
-    mpc_define(Term, mpc_apply(mpc_re("[a-zA-Z]+"), dummy_ctor)); // New definition for Term
+    mpc_define(Term, mpc_re("[a-zA-Z]+")); // New definition for Term: matches a letter // New definition for Term
 
     // This parse should still work cleanly, using Expr's *copied* definition of Term (numbers).
     // It should fail to match "a+b" because the copy of Term in Expr is still numeric.
@@ -181,7 +186,6 @@ TEST(MpcCopy, MemoryLeakDemonstration)
     // Clean up only the original parser
     mpc_cleanup(1, Original);
     // The 'Copy' parser and its internal structures are now leaked.
-
     // CppUTest will report a memory leak here if enabled.
     // To explicitly demonstrate the leak without relying on the framework,
     // you would need to track malloc/free calls manually or use a tool like Valgrind.
