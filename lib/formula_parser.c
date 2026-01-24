@@ -470,13 +470,13 @@ formula_compile(char const * const formula)
     // Numbers
     mpc_define(f->Float, mpc_apply(mpc_re("-?[0-9]+\\.[0-9]+"), (mpc_apply_t)mpc_make_number));
     mpc_define(f->Int, mpc_apply(mpc_re("-?[0-9]+"), (mpc_apply_t)mpc_make_number));
-    mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
+    mpc_define(f->Number, mpc_stripl(mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int)))); // 'number' just passes through float or int AST
 
     // Variable
-    mpc_define(f->Variable, mpc_apply(mpc_sym("x"), (mpc_apply_t)mpc_make_variable));
+    mpc_define(f->Variable, mpc_apply(mpc_stripl(mpc_string("x")), (mpc_apply_t)mpc_make_variable));
 
     // Constant (treated as variables for evaluation as per current eval logic)
-    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_sym("pi"), mpc_sym("e")), (mpc_apply_t)mpc_make_constant));
+    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_stripl(mpc_string("pi")), mpc_stripl(mpc_string("e"))), (mpc_apply_t)mpc_make_constant));
 
     // Factor rules: order matters (longest match first)
     mpc_define(f->Factor, mpc_or(13, // Increased count due to functions and unary minus

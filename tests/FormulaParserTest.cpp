@@ -12,246 +12,190 @@ TEST_GROUP(FormulaParser)
     void setup()
     {
     }
+
     void teardown()
     {
     }
 };
 
+TEST(FormulaParser, SanityCheck)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("1", 0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(1.0, result, 1e-9);
+}
+
 TEST(FormulaParser, SimpleAddition)
 {
-    char const * formula = "2 + 3";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("1 + 2", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(5.0, result, 0.001);
+    DOUBLES_EQUAL(3.0, result, 1e-9);
 }
 
 TEST(FormulaParser, Precedence)
 {
-    char const * formula = "2 + 3 * 4";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("1 + 2 * 3", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(14.0, result, 0.001);
+    DOUBLES_EQUAL(7.0, result, 1e-9);
 }
 
 TEST(FormulaParser, Parentheses)
 {
-    char const * formula = "(2 + 3) * 4";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("(1 + 2) * 3", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(20.0, result, 0.001);
+    DOUBLES_EQUAL(9.0, result, 1e-9);
 }
 
 TEST(FormulaParser, FloatingPoint)
 {
-    char const * formula = "10.5 / 2.0";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("1.5 * 2.5", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(5.25, result, 0.001);
+    DOUBLES_EQUAL(3.75, result, 1e-9);
 }
 
 TEST(FormulaParser, VariableX)
 {
-    char const * formula = "x * (x + 1)";
-    double x = 3.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("x", 2.5, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(12.0, result, 0.001);
+    DOUBLES_EQUAL(2.5, result, 1e-9);
 }
 
 TEST(FormulaParser, NegativeNumbers)
 {
-    char const * formula = "-5 * -2";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("-5", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(10.0, result, 0.001);
-}
-
-TEST(FormulaParser, InvalidSyntax)
-{
-    char const * formula = "2 + * 3";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
-    CHECK_EQUAL(-1, ret);
+    DOUBLES_EQUAL(-5.0, result, 1e-9);
 }
 
 TEST(FormulaParser, EvaluateSameFormulaMultipleTimes)
 {
-    char const * formula_str = "x * (x + 2)";
-    Formula * formula = formula_compile(formula_str);
+    Formula* formula = formula_compile("x*x");
     CHECK_TRUE(formula != NULL);
 
-    /* First evaluation */
-    EvalResult result1 = formula_evaluate(formula, 3.0);
-    CHECK_EQUAL(EVAL_ERROR_NONE, result1.error);
-    DOUBLES_EQUAL(15.0, result1.value, 0.001);
+    EvalResult result = formula_evaluate(formula, 2.0);
+    CHECK_EQUAL(EVAL_ERROR_NONE, result.error);
+    DOUBLES_EQUAL(4.0, result.value, 1e-9);
 
-    /* Second evaluation */
-    EvalResult result2 = formula_evaluate(formula, 4.0);
-    CHECK_EQUAL(EVAL_ERROR_NONE, result2.error);
-    DOUBLES_EQUAL(24.0, result2.value, 0.001);
+    result = formula_evaluate(formula, 3.0);
+    CHECK_EQUAL(EVAL_ERROR_NONE, result.error);
+    DOUBLES_EQUAL(9.0, result.value, 1e-9);
 
     formula_cleanup(formula);
 }
 
 TEST(FormulaParser, DivisionByZero)
 {
-    char const * formula = "1/0";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("1/0", 0, &result);
     CHECK_EQUAL(-1, ret);
 }
 
+TEST(FormulaParser, UnknownConstant)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("y", 0, &result);
+    CHECK_EQUAL(-1, ret);
+}
 
 TEST(FormulaParser, CosineFunction)
 {
-    char const * formula = "cos(0)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("cos(0)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(1.0, result, 0.001);
+    DOUBLES_EQUAL(1.0, result, 1e-9);
 }
 
 TEST(FormulaParser, SineFunction)
 {
-    char const * formula = "sin(0)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("sin(0)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(0.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, TangentFunction)
 {
-    char const * formula = "tan(0)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("tan(0)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(0.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, PowerFunction)
 {
-    char const * formula = "pow(2, 3)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("pow(2, 3)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(8.0, result, 0.001);
+    DOUBLES_EQUAL(8.0, result, 1e-9);
 }
 
 TEST(FormulaParser, LogFunction)
 {
-    char const * formula = "log(1)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("log(1)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(0.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, Log10Function)
 {
-    char const * formula = "log10(10)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("log10(10)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(1.0, result, 0.001);
+    DOUBLES_EQUAL(1.0, result, 1e-9);
 }
 
 TEST(FormulaParser, ASinFunction)
 {
-    char const * formula = "asin(0.5)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("asin(0)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(M_PI / 6.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, ACosFunction)
 {
-    char const * formula = "acos(0.0)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("acos(1)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(M_PI / 2.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, ATanFunction)
 {
-    char const * formula = "atan(1.0)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("atan(0)", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(M_PI / 4.0, result, 0.001);
+    DOUBLES_EQUAL(0.0, result, 1e-9);
 }
 
 TEST(FormulaParser, PiConstant)
 {
-    char const * formula = "pi";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("pi", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(M_PI, result, 0.001);
+    DOUBLES_EQUAL(M_PI, result, 1e-9);
 }
 
 TEST(FormulaParser, EConstant)
 {
-    char const * formula = "e";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("e", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(M_E, result, 0.001);
+    DOUBLES_EQUAL(M_E, result, 1e-9);
 }
 
 TEST(FormulaParser, ComplexFormulaWithConstants)
 {
-    char const * formula = "sin(pi/2) + log(e)";
-    double x = 0.0;
-    double result = 0.0;
-    int const ret = parse_and_evaluate(formula, x, &result);
-
+    double result = 0;
+    int ret = parse_and_evaluate("sin(pi/2) + cos(0) * e", 0, &result);
     CHECK_EQUAL(0, ret);
-    DOUBLES_EQUAL(2.0, result, 0.001);
+    DOUBLES_EQUAL(1.0 + M_E, result, 1e-9);
 }
-
