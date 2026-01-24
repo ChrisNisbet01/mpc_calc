@@ -737,14 +737,6 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 char const *op = tree->data.unary_op.operator_name;
 
                 if (strcmp(op, "-") == 0) return (EvalResult){.value = -child_val, .error = EVAL_ERROR_NONE};
-                if (strcmp(op, "cos") == 0) return (EvalResult){.value = cos(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "sin") == 0) return (EvalResult){.value = sin(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "tan") == 0) return (EvalResult){.value = tan(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "acos") == 0) return (EvalResult){.value = acos(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "asin") == 0) return (EvalResult){.value = asin(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "atan") == 0) return (EvalResult){.value = atan(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "log") == 0) return (EvalResult){.value = log(child_val), .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "log10") == 0) return (EvalResult){.value = log10(child_val), .error = EVAL_ERROR_NONE};
                 return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
             }
         case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
@@ -753,14 +745,39 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 size_t num_args = tree->data.function_call.num_args;
                 FormulaAST * const *args = tree->data.function_call.args;
 
-                if (strcmp(func_name, "pow") == 0) {
-                    if (num_args != 2) return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION}; // Pow expects 2 args
-                    EvalResult arg1_res = eval_ast(args[0], x_value);
-                    if (arg1_res.error != EVAL_ERROR_NONE) return arg1_res;
-                    EvalResult arg2_res = eval_ast(args[1], x_value);
-                    if (arg2_res.error != EVAL_ERROR_NONE) return arg2_res;
-                    return (EvalResult){.value = pow(arg1_res.value, arg2_res.value), .error = EVAL_ERROR_NONE};
+                // Evaluate arguments
+                EvalResult *arg_results = calloc(num_args, sizeof(EvalResult));
+                if (!arg_results) return (EvalResult){.error = EVAL_ERROR_UNKNOWN};
+
+                for (size_t i = 0; i < num_args; ++i) {
+                    arg_results[i] = eval_ast(args[i], x_value);
+                    if (arg_results[i].error != EVAL_ERROR_NONE) {
+                        free(arg_results);
+                        return arg_results[i];
+                    }
                 }
+
+                // Single argument functions
+                if (num_args == 1) {
+                    double arg_val = arg_results[0].value;
+                    if (strcmp(func_name, "cos") == 0) { free(arg_results); return (EvalResult){.value = cos(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "sin") == 0) { free(arg_results); return (EvalResult){.value = sin(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "tan") == 0) { free(arg_results); return (EvalResult){.value = tan(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "acos") == 0) { free(arg_results); return (EvalResult){.value = acos(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "asin") == 0) { free(arg_results); return (EvalResult){.value = asin(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "atan") == 0) { free(arg_results); return (EvalResult){.value = atan(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "log") == 0) { free(arg_results); return (EvalResult){.value = log(arg_val), .error = EVAL_ERROR_NONE}; }
+                    else if (strcmp(func_name, "log10") == 0) { free(arg_results); return (EvalResult){.value = log10(arg_val), .error = EVAL_ERROR_NONE}; }
+                }
+                
+                // Multi-argument functions
+                if (strcmp(func_name, "pow") == 0) {
+                    if (num_args != 2) { free(arg_results); return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION}; } // Pow expects 2 args
+                    EvalResult res = (EvalResult){.value = pow(arg_results[0].value, arg_results[1].value), .error = EVAL_ERROR_NONE};
+                    free(arg_results);
+                    return res;
+                }
+                free(arg_results);
                 return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
             }
         // No default or FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER as it's handled as UNARY_OPERATOR
