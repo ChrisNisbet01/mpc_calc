@@ -245,26 +245,6 @@ static mpc_val_t *mpc_make_constant(mpc_val_t *val) {
     return node;
 }
 
-// MPC callback for binary operations (mpc_fold_t)
-// Assumes a flat list of (left_operand_AST, operator_string, right_operand_AST, operator_string, right_operand_AST...)
-// The function is responsible for freeing all input mpc_val_t's that are consumed and not part of the returned AST.
-static mpc_val_t *mpc_make_binary_op(int n_args, mpc_val_t **args) {
-    FormulaAST *left_ast = (FormulaAST *)args[0]; // First operand AST. This will be returned, so don't free its mpc_val_t.
-
-    for (int i = 1; i < n_args; i += 2) {
-        char *op_name = (char *)args[i]; // Operator string. This is consumed and copied.
-        FormulaAST *right_ast = (FormulaAST *)args[i+1]; // Right operand AST. This is consumed.
-
-        left_ast = formula_ast_create_binary_op(op_name, left_ast, right_ast);
-        free(op_name); // Free the operator string (mpc_val_t was a char*, we strdup'd it)
-        // No need to free right_ast here as it's now owned by left_ast
-    }
-    return left_ast; // The `mpc_val_t` returned is a `FormulaAST*` which is now the root of this sub-tree.
-                     // The original `args[0]` (left_ast) was either the initial value or a new binary op node.
-                     // All other `mpc_val_t*`s in `args` (operators and right_ast) are now conceptually handled.
-                     // No further explicit free needed in `mpc_fold_t` if children are 'moved'.
-}
-
 // MPC callback for function calls (mpc_fold_t)
 // E.g., for "pow(expr, expr)": [ str("pow"), char("("), expr1_ast, char(","), expr2_ast, char(")") ]
 static mpc_val_t *mpc_make_function_call(int n_args, mpc_val_t **args) {
@@ -419,7 +399,11 @@ static void mpc_destroy_collected_binary_op_parts(mpc_val_t *val) {
 // where collected_binary_op_parts_array is (BinaryOpPart**) from mpc_collect_binary_op_parts
 static mpc_val_t *mpc_fold_left_associative_binary_op(int n_args, mpc_val_t **args) {
     // n_args will be 2: args[0] is initial_ast, args[1] is (BinaryOpPart**) from mpc_collect_binary_op_parts
-    FormulaAST *left_ast = (FormulaAST *)args[0];
+    if (n_args != 2)
+    {
+        return NULL;
+    }
+    FormulaAST * left_ast = (FormulaAST *)args[0];
     BinaryOpPart **parts_array = (BinaryOpPart **)args[1];
 
     if (parts_array) {
@@ -764,8 +748,9 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 for (size_t i = 0; i < num_args; ++i) {
                     arg_results[i] = eval_ast(args[i], x_value);
                     if (arg_results[i].error != EVAL_ERROR_NONE) {
+                        EvalResult res = arg_results[i];
                         free(arg_results);
-                        return arg_results[i];
+                        return res;
                     }
                 }
 
@@ -784,7 +769,11 @@ eval_ast(FormulaAST const * const tree, double const x_value)
 
                 // Multi-argument functions
                 if (strcmp(func_name, "pow") == 0) {
-                    if (num_args != 2) { free(arg_results); return (EvalResult){.error = EVAL_ERROR_INVALID_ARGUMENTS}; } // Pow expects 2 args
+                    if (num_args != 2)
+                    {
+                        free(arg_results);
+                        return (EvalResult){.error = EVAL_ERROR_INVALID_ARGUMENTS};
+                    } // Pow expects 2 args
                     EvalResult res = (EvalResult){.value = pow(arg_results[0].value, arg_results[1].value), .error = EVAL_ERROR_NONE};
                     free(arg_results);
                     return res;

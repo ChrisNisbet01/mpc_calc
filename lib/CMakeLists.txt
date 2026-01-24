@@ -21,6 +21,9 @@ target_compile_options(mpc_lib PRIVATE -fPIC)
 add_library(formula_parser_static STATIC
     formula_parser.c
 )
+target_compile_options(formula_parser_static PRIVATE
+    -Wall -Wextra -Werror
+)
 
 add_dependencies(formula_parser_static mpc_lib)
 
@@ -36,6 +39,9 @@ target_link_libraries(formula_parser_static PUBLIC
 
 add_library(formula_parser_shared SHARED
     formula_parser.c
+)
+target_compile_options(formula_parser_shared PRIVATE
+    -Wall -Wextra -Werror
 )
 
 add_dependencies(formula_parser_shared mpc_lib)
