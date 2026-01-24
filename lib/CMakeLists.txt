@@ -13,20 +13,16 @@ if(NOT mpc_POPULATED)
     FetchContent_Populate(mpc)
 endif()
 
-add_custom_target(build_mpc
-    COMMAND ${CMAKE_COMMAND} -E chdir ${mpc_SOURCE_DIR} make clean
-    COMMAND ${CMAKE_COMMAND} -E chdir ${mpc_SOURCE_DIR} make CFLAGS=-fPIC libs
-    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/include/mpc
-    COMMAND ${CMAKE_COMMAND} -E copy ${mpc_SOURCE_DIR}/mpc.h ${CMAKE_BINARY_DIR}/include/mpc/mpc.h
-    BYPRODUCTS ${mpc_SOURCE_DIR}/build/libmpc.a
-    COMMENT "Building mpc library and copying headers"
-)
+# Create mpc_lib as a proper CMake target
+add_library(mpc_lib STATIC ${mpc_SOURCE_DIR}/mpc.c)
+target_include_directories(mpc_lib PUBLIC ${mpc_SOURCE_DIR}) # Make mpc.h available
+target_compile_options(mpc_lib PRIVATE -fPIC)
 
 add_library(formula_parser_static STATIC
     formula_parser.c
 )
 
-add_dependencies(formula_parser_static build_mpc)
+add_dependencies(formula_parser_static mpc_lib)
 
 target_include_directories(formula_parser_static PUBLIC
     $<INSTALL_INTERFACE:include>
@@ -35,14 +31,14 @@ target_include_directories(formula_parser_static PUBLIC
 )
 
 target_link_libraries(formula_parser_static PUBLIC
-    ${mpc_SOURCE_DIR}/build/libmpc.a
+    mpc_lib
 )
 
 add_library(formula_parser_shared SHARED
     formula_parser.c
 )
 
-add_dependencies(formula_parser_shared build_mpc)
+add_dependencies(formula_parser_shared mpc_lib)
 
 target_include_directories(formula_parser_shared PUBLIC
     $<INSTALL_INTERFACE:include>
@@ -51,7 +47,7 @@ target_include_directories(formula_parser_shared PUBLIC
 )
 
 target_link_libraries(formula_parser_shared PUBLIC
-    ${mpc_SOURCE_DIR}/build/libmpc.a
+    mpc_lib
 )
 
 install(TARGETS formula_parser_static formula_parser_shared
