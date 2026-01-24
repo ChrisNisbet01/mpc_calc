@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-
 // Internal structure for FormulaAST
 typedef enum {
     FORMULA_AST_NODE_TYPE_NUMBER,
@@ -41,6 +40,40 @@ struct FormulaAST {
     } data;
     // Potentially add line/column information here for error reporting
 };
+
+static void formula_ast_print(FormulaAST const *node, int indent) {
+    if (!node) {
+        return;
+    }
+
+    for (int i = 0; i < indent; ++i) {
+        fprintf(stdout, "  ");
+    }
+
+    switch (node->type) {
+        case FORMULA_AST_NODE_TYPE_NUMBER:
+            fprintf(stdout, "Number: %f\n", node->data.number_value);
+            break;
+        case FORMULA_AST_NODE_TYPE_VARIABLE:
+            fprintf(stdout, "Variable: %s\n", node->data.variable_name);
+            break;
+        case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
+            fprintf(stdout, "Binary Op: %s\n", node->data.binary_op.operator_name);
+            formula_ast_print(node->data.binary_op.left, indent + 1);
+            formula_ast_print(node->data.binary_op.right, indent + 1);
+            break;
+        case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
+            fprintf(stdout, "Unary Op: %s\n", node->data.unary_op.operator_name);
+            formula_ast_print(node->data.unary_op.child, indent + 1);
+            break;
+        case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
+            fprintf(stdout, "Function Call: %s (args: %zu)\n", node->data.function_call.function_name, node->data.function_call.num_args);
+            for (size_t i = 0; i < node->data.function_call.num_args; ++i) {
+                formula_ast_print(node->data.function_call.args[i], indent + 1);
+            }
+            break;
+    }
+}
 
 // Forward declaration of internal AST destruction function
 static void formula_ast_destroy_internal(FormulaAST *node);
@@ -566,6 +599,9 @@ formula_compile(char const * const formula)
     {
         // Now parse_result.output should directly be a FormulaAST*
         f->ast = (FormulaAST *)parse_result.output;
+        fprintf(stdout, "--- AST --- \n");
+        formula_ast_print(f->ast, 0);
+        fprintf(stdout, "--- AST --- \n");
         return f;
     }
     else
