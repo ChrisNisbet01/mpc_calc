@@ -41,50 +41,14 @@ struct FormulaAST {
     // Potentially add line/column information here for error reporting
 };
 
-static void formula_ast_print(FormulaAST const *node, int indent) {
-    if (!node) {
-        return;
-    }
-
-    for (int i = 0; i < indent; ++i) {
-        fprintf(stdout, "  ");
-    }
-
-    switch (node->type) {
-        case FORMULA_AST_NODE_TYPE_NUMBER:
-            fprintf(stdout, "Number: %f\n", node->data.number_value);
-            break;
-        case FORMULA_AST_NODE_TYPE_VARIABLE:
-            fprintf(stdout, "Variable: %s\n", node->data.variable_name);
-            break;
-        case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
-            fprintf(stdout, "Binary Op: %s\n", node->data.binary_op.operator_name);
-            formula_ast_print(node->data.binary_op.left, indent + 1);
-            formula_ast_print(node->data.binary_op.right, indent + 1);
-            break;
-        case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
-            fprintf(stdout, "Unary Op: %s\n", node->data.unary_op.operator_name);
-            formula_ast_print(node->data.unary_op.child, indent + 1);
-            break;
-        case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
-            fprintf(stdout, "Function Call: %s (args: %zu)\n", node->data.function_call.function_name, node->data.function_call.num_args);
-            for (size_t i = 0; i < node->data.function_call.num_args; ++i) {
-                formula_ast_print(node->data.function_call.args[i], indent + 1);
-            }
-            break;
-    }
-}
-
 // Forward declaration of internal AST destruction function
 static void formula_ast_destroy_internal(FormulaAST *node);
-
 
 /*
  * Forward declarations for AST evaluation.
  */
 static EvalResult
 eval_ast(struct FormulaAST const * const tree, double const x_value);
-
 
 /*
  * The internal structure for a compiled formula context.
@@ -237,14 +201,12 @@ formula_ast_destroy(FormulaAST *ast)
 
 // MPC callback for numbers: converts a string to a double and creates a FormulaAST number node.
 static mpc_val_t *mpc_make_float(mpc_val_t *val) {
-    fprintf(stdout, "%s (%s)\n", __func__, (char *)val);
     double value = atof((char *)val);
     free(val); // Free the string value from MPC
     return formula_ast_create_number(value);
 }
 
 static mpc_val_t *mpc_make_integer(mpc_val_t *val) {
-    fprintf(stdout, "%s (%s)\n", __func__, (char *)val);
     double value = atof((char *)val);
     free(val); // Free the string value from MPC
     return formula_ast_create_number(value);
@@ -252,7 +214,6 @@ static mpc_val_t *mpc_make_integer(mpc_val_t *val) {
 
 // MPC callback for variables: creates a FormulaAST variable node from a string.
 static mpc_val_t *mpc_make_variable(mpc_val_t *val) {
-    fprintf(stdout, "%s (%s)\n", __func__, (char *)val);
     char *name = (char *)val;
     FormulaAST *node = formula_ast_create_variable(name);
     free(val); // Free the string value from MPC
@@ -261,7 +222,6 @@ static mpc_val_t *mpc_make_variable(mpc_val_t *val) {
 
 // MPC callback for constants: creates a FormulaAST variable node from a string (e.g., "pi", "e").
 static mpc_val_t *mpc_make_constant(mpc_val_t *val) {
-    fprintf(stdout, "%s (%s)\n", __func__, (char *)val);
     char *name = (char *)val;
     FormulaAST *node = formula_ast_create_variable(name); // Treat constants as variables for evaluation.
     free(val); // Free the string value from MPC
@@ -272,7 +232,6 @@ static mpc_val_t *mpc_make_constant(mpc_val_t *val) {
 // Assumes a flat list of (left_operand_AST, operator_string, right_operand_AST, operator_string, right_operand_AST...)
 // The function is responsible for freeing all input mpc_val_t's that are consumed and not part of the returned AST.
 static mpc_val_t *mpc_make_binary_op(int n_args, mpc_val_t **args) {
-    fprintf(stdout, "%s\n", __func__);
     FormulaAST *left_ast = (FormulaAST *)args[0]; // First operand AST. This will be returned, so don't free its mpc_val_t.
 
     for (int i = 1; i < n_args; i += 2) {
@@ -292,7 +251,6 @@ static mpc_val_t *mpc_make_binary_op(int n_args, mpc_val_t **args) {
 // MPC callback for function calls (mpc_fold_t)
 // E.g., for "pow(expr, expr)": [ str("pow"), char("("), expr1_ast, char(","), expr2_ast, char(")") ]
 static mpc_val_t *mpc_make_function_call(int n_args, mpc_val_t **args) {
-    fprintf(stdout, "%s (%s)\n", __func__, (char *)args[0]);
     char *func_name_str = (char *)args[0]; // Function name string
 
     // Calculate the number of arguments.
@@ -481,39 +439,6 @@ eval_error_to_string(EvalError error)
     }
 }
 
-static mpc_val_t *
-matched_number(mpc_val_t *x)
-{
-    fprintf(stdout, "%s\n", __func__);
-    return x;
-}
-
-static mpc_val_t *
-matched_factor(mpc_val_t *x)
-{
-    fprintf(stdout, "%s\n", __func__);
-    return x;
-}
-static mpc_val_t *
-matched_term(mpc_val_t *x)
-{
-    fprintf(stdout, "%s\n", __func__);
-    return x;
-}
-static mpc_val_t *
-matched_expression(mpc_val_t *x)
-{
-    fprintf(stdout, "%s\n", __func__);
-    return x;
-}
-static mpc_val_t *
-matched_formula(mpc_val_t *x)
-{
-    fprintf(stdout, "%s\n", __func__);
-    return x;
-}
-
-
 /*
  * See header file for documentation.
  */
@@ -545,7 +470,7 @@ formula_compile(char const * const formula)
     // Numbers
     mpc_define(f->Float, mpc_apply(mpc_re("[0-9]+\\.[0-9]+"), mpc_make_float));
     mpc_define(f->Int, mpc_apply(mpc_re("[0-9]+"), mpc_make_integer));
-    mpc_define(f->Number, mpc_apply(mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int)), matched_number)); // 'number' just passes through float or int AST
+    mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
 
     // Variable
     mpc_define(f->Variable, mpc_apply(mpc_stripl(mpc_string("x")), mpc_make_variable));
@@ -554,7 +479,7 @@ formula_compile(char const * const formula)
     mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_stripl(mpc_string("pi")), mpc_stripl(mpc_string("e"))), mpc_make_constant));
 
     // Factor rules: order matters (longest match first)
-    mpc_define(f->Factor, mpc_apply(mpc_or(14, // Increased count due to functions and unary minus
+    mpc_define(f->Factor, mpc_or(14, // Increased count due to functions and unary minus
         mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
         mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log10")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
         mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
@@ -569,29 +494,35 @@ formula_compile(char const * const formula)
         mpc_stripl(mpc_copy(f->Number)),    // Number (must be after functions to avoid partial matches)
         mpc_stripl(mpc_copy(f->Constant)),  // Constant
         mpc_stripl(mpc_copy(f->Variable))   // Variable
-    ), matched_factor));
+    ));
 
 
     // Term (multiplication and division)
     // term : <factor> (('*' | '/') <factor>)* ;
-    mpc_define(f->Term, mpc_apply(mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
+    mpc_define(f->Term, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Factor), // The initial factor
         mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("*/")), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
-    ), matched_term));
+    ));
 
 
     // Expression (addition and subtraction)
     // expr : <term> (('+' | '-') <term>)* ;
-    mpc_define(f->Expr, mpc_apply(mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
+    mpc_define(f->Expr, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Term), // The initial term
         mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("+-")), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
-    ), matched_expression));
+    ));
 
     // Formula (start and end of input)
-    mpc_define(f->Formula, mpc_apply(mpc_and(3, mpcf_snd_free, mpc_soi(), mpc_copy(f->Expr), mpc_eoi(), mpcf_dtor_null, (mpc_dtor_t)formula_ast_destroy), matched_formula)); // Keep only the Expr AST
-
+    mpc_define(f->Formula, mpc_and(3,
+                                   mpcf_snd_free,
+                                   mpc_soi(),
+                                   mpc_copy(f->Expr),
+                                   mpc_eoi(),
+                                   mpcf_dtor_null,
+                                   (mpc_dtor_t)formula_ast_destroy)
+               ); // Keep only the Expr AST
 
     mpc_result_t parse_result = {0};
 
@@ -599,9 +530,6 @@ formula_compile(char const * const formula)
     {
         // Now parse_result.output should directly be a FormulaAST*
         f->ast = (FormulaAST *)parse_result.output;
-        fprintf(stdout, "--- AST --- \n");
-        formula_ast_print(f->ast, 0);
-        fprintf(stdout, "--- AST --- \n");
         return f;
     }
     else
@@ -651,15 +579,12 @@ formula_cleanup(Formula * f)
 int
 parse_and_evaluate(char const * const formula, double const x, double * const result)
 {
-    fprintf(stdout, "%s: %s\n", __func__, formula);
-
     Formula * const f = formula_compile(formula);
 
     if (NULL == f)
     {
         return -1;
     }
-    fprintf(stdout, "%s: compiled\n", __func__);
 
     EvalResult const eval_result = formula_evaluate(f, x);
     if (eval_result.error != EVAL_ERROR_NONE)
@@ -769,7 +694,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                     else if (strcmp(func_name, "log") == 0) { free(arg_results); return (EvalResult){.value = log(arg_val), .error = EVAL_ERROR_NONE}; }
                     else if (strcmp(func_name, "log10") == 0) { free(arg_results); return (EvalResult){.value = log10(arg_val), .error = EVAL_ERROR_NONE}; }
                 }
-                
+
                 // Multi-argument functions
                 if (strcmp(func_name, "pow") == 0) {
                     if (num_args != 2) { free(arg_results); return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION}; } // Pow expects 2 args
