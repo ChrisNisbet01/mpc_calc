@@ -480,20 +480,20 @@ formula_compile(char const * const formula)
 
     // Factor rules: order matters (longest match first)
     mpc_define(f->Factor, mpc_or(14, // Increased count due to functions and unary minus
-        mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_tok(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log10"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("acos"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("asin"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("atan"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("cos"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("sin"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("tan"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
-        mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_sym("pow"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(',')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
-        mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy), // Parenthesized expression
-        mpc_copy(f->Number),    // Number (must be after functions to avoid partial matches)
-        mpc_copy(f->Constant),  // Constant
-        mpc_copy(f->Variable)   // Variable
+        mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log10")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("acos")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("asin")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("atan")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("cos")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("sin")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("tan")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
+        mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("pow")), mpc_stripl(mpc_char('(')), mpc_copy(f->Expr), mpc_stripl(mpc_char(',')), mpc_copy(f->Expr), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
+        mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)), // Parenthesized expression
+        mpc_stripl(mpc_copy(f->Number)),    // Number (must be after functions to avoid partial matches)
+        mpc_stripl(mpc_copy(f->Constant)),  // Constant
+        mpc_stripl(mpc_copy(f->Variable))   // Variable
     ));
 
 
@@ -501,7 +501,7 @@ formula_compile(char const * const formula)
     // term : <factor> (('*' | '/') <factor>)* ;
     mpc_define(f->Term, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Factor), // The initial factor
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_tok(mpc_oneof("*/")), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
+        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("*/")), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
@@ -510,7 +510,7 @@ formula_compile(char const * const formula)
     // expr : <term> (('+' | '-') <term>)* ;
     mpc_define(f->Expr, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Term), // The initial term
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_tok(mpc_oneof("+-")), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
+        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("+-")), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
