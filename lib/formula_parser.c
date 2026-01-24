@@ -468,9 +468,9 @@ formula_compile(char const * const formula)
     // Define individual parsers using mpc_* combinators and our custom callbacks
 
     // Numbers
-    mpc_define(f->Float, mpc_apply(mpc_re("-?[0-9]+\\.[0-9]+"), (mpc_apply_t)mpc_make_number));
-    mpc_define(f->Int, mpc_apply(mpc_re("-?[0-9]+"), (mpc_apply_t)mpc_make_number));
-    mpc_define(f->Number, mpc_stripl(mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int)))); // 'number' just passes through float or int AST
+    mpc_define(f->Float, mpc_apply(mpc_re("[0-9]+\\.[0-9]+"), (mpc_apply_t)mpc_make_number));
+    mpc_define(f->Int, mpc_apply(mpc_re("[0-9]+"), (mpc_apply_t)mpc_make_number));
+    mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
 
     // Variable
     mpc_define(f->Variable, mpc_apply(mpc_stripl(mpc_string("x")), (mpc_apply_t)mpc_make_variable));
@@ -479,7 +479,7 @@ formula_compile(char const * const formula)
     mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_stripl(mpc_string("pi")), mpc_stripl(mpc_string("e"))), (mpc_apply_t)mpc_make_constant));
 
     // Factor rules: order matters (longest match first)
-    mpc_define(f->Factor, mpc_or(13, // Increased count due to functions and unary minus
+    mpc_define(f->Factor, mpc_or(14, // Increased count due to functions and unary minus
         mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_tok(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
         mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log10"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
         mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
@@ -655,6 +655,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 double child_val = child_res.value;
                 char const *op = tree->data.unary_op.operator_name;
 
+                if (strcmp(op, "-") == 0) return (EvalResult){.value = -child_val, .error = EVAL_ERROR_NONE};
                 if (strcmp(op, "cos") == 0) return (EvalResult){.value = cos(child_val), .error = EVAL_ERROR_NONE};
                 else if (strcmp(op, "sin") == 0) return (EvalResult){.value = sin(child_val), .error = EVAL_ERROR_NONE};
                 else if (strcmp(op, "tan") == 0) return (EvalResult){.value = tan(child_val), .error = EVAL_ERROR_NONE};
