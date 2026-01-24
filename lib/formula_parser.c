@@ -16,7 +16,7 @@ typedef enum {
     FORMULA_AST_NODE_TYPE_BINARY_OPERATOR,
     FORMULA_AST_NODE_TYPE_UNARY_OPERATOR,
     FORMULA_AST_NODE_TYPE_FUNCTION_CALL,
-    FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER, // For handling negative numbers parsed as unary ops
+    // FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER, // This is handled as a UNARY_OPERATOR with "-"
 } FormulaASTNodeType;
 
 struct FormulaAST {
@@ -190,11 +190,7 @@ formula_ast_destroy_internal(FormulaAST *node)
             }
             free(node->data.function_call.args);
             break;
-        case FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER:
-            // Assuming this is handled as a unary operation with an operator name
-            free(node->data.unary_op.operator_name); // If there's a distinct operator string
-            formula_ast_destroy_internal(node->data.unary_op.child);
-            break;
+        // No default or FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER as it's handled as UNARY_OPERATOR
     }
     free(node);
 }
@@ -304,6 +300,21 @@ static mpc_val_t *mpc_make_function_call(int n_args, mpc_val_t **args) {
     return node;
 }
 
+// MPC fold callback for unary operators like negation
+static mpc_val_t *mpc_make_unary_op_fold(int n_args, mpc_val_t **args) {
+    // Expects: [op_str, child_ast]
+    if (n_args != 2) {
+        if (args[0]) free(args[0]);
+        if (args[1]) formula_ast_destroy_internal((FormulaAST*)args[1]);
+        return NULL; // Error
+    }
+    char *op_name = (char *)args[0];
+    FormulaAST *child = (FormulaAST *)args[1];
+    FormulaAST *node = formula_ast_create_unary_op(op_name, child);
+    free(op_name); // Free the operator string from MPC
+    return node;
+}
+
 // Struct to hold an operator string and its corresponding operand AST node
 // This struct is internal to the handling of binary operations.
 typedef struct {
@@ -383,46 +394,6 @@ static void mpc_destroy_collected_binary_op_parts(mpc_val_t *val) {
     }
 }
 
-// Struct to hold an operator and its corresponding operand AST node
-typedef struct {
-    char *op_name;
-    FormulaAST *operand;
-} OpOperandPair;
-
-// MPC callback to create an OpOperandPair (for use with mpc_and)
-static mpc_val_t *mpc_make_op_operand_pair(int n_args, mpc_val_t **args) {
-    // Expects: [op_str, operand_ast]. n_args should be 2.
-    if (n_args != 2) {
-        // Handle error, this shouldn't happen with correct grammar
-        // free(args[0]); // Free operator string
-        // formula_ast_destroy_internal((FormulaAST *)args[1]); // Free operand AST
-        return NULL; // Should not happen with correct grammar, but for safety
-    }
-
-    char *op_name = (char *)args[0];
-    FormulaAST *operand_ast = (FormulaAST *)args[1];
-
-    OpOperandPair *pair = malloc(sizeof(OpOperandPair));
-    if (!pair) {
-        free(op_name);
-        formula_ast_destroy_internal(operand_ast);
-        return NULL;
-    }
-    pair->op_name = op_name; // Take ownership of the string
-    pair->operand = operand_ast; // Take ownership of the AST node
-    return pair;
-}
-
-// Destructor for OpOperandPair (for mpc_dtor_t)
-static void mpc_destroy_op_operand_pair(mpc_val_t *val) {
-    OpOperandPair *pair = (OpOperandPair *)val;
-    if (pair) {
-        free(pair->op_name);
-        formula_ast_destroy_internal(pair->operand);
-        free(pair);
-    }
-}
-
 // MPC fold callback for left-associative binary operations.
 // args will be [initial_ast, collected_binary_op_parts_array]
 // where collected_binary_op_parts_array is (BinaryOpPart**) from mpc_collect_binary_op_parts
@@ -468,10 +439,6 @@ eval_error_to_string(EvalError error)
 
 
 
-
-
-
-
 /*
  * See header file for documentation.
  */
@@ -506,15 +473,25 @@ formula_compile(char const * const formula)
     mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
 
     // Variable
-    mpc_define(f->Variable, mpc_apply(mpc_string("x"), (mpc_apply_t)mpc_make_variable));
+    mpc_define(f->Variable, mpc_apply(mpc_sym("x"), (mpc_apply_t)mpc_make_variable));
 
     // Constant (treated as variables for evaluation as per current eval logic)
-    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_string("pi"), mpc_string("e")), (mpc_apply_t)mpc_make_constant));
+    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_sym("pi"), mpc_sym("e")), (mpc_apply_t)mpc_make_constant));
 
     // Factor rules: order matters (longest match first)
-    mpc_define(f->Factor, mpc_or(4,
+    mpc_define(f->Factor, mpc_or(13, // Increased count due to functions and unary minus
+        mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_tok(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log10"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("log"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("acos"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("asin"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("atan"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("cos"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("sin"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
+        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_sym("tan"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
+        mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_sym("pow"), mpc_tok(mpc_char('(')), mpc_copy(f->Expr), mpc_tok(mpc_char(',')), mpc_copy(f->Expr), mpc_tok(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
         mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy), // Parenthesized expression
-        mpc_copy(f->Number),    // Number
+        mpc_copy(f->Number),    // Number (must be after functions to avoid partial matches)
         mpc_copy(f->Constant),  // Constant
         mpc_copy(f->Variable)   // Variable
     ));
@@ -524,7 +501,7 @@ formula_compile(char const * const formula)
     // term : <factor> (('*' | '/') <factor>)* ;
     mpc_define(f->Term, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Factor), // The initial factor
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_oneof("*/"), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
+        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_tok(mpc_oneof("*/")), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
@@ -533,7 +510,7 @@ formula_compile(char const * const formula)
     // expr : <term> (('+' | '-') <term>)* ;
     mpc_define(f->Expr, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
         mpc_copy(f->Term), // The initial term
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_oneof("+-"), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
+        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_tok(mpc_oneof("+-")), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
@@ -704,13 +681,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 }
                 return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
             }
-        case FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER: // This type might be redundant if '-' is just a unary op
-             {
-                EvalResult child_res = eval_ast(tree->data.unary_op.child, x_value);
-                if (child_res.error != EVAL_ERROR_NONE) return child_res;
-                return (EvalResult){.value = -child_res.value, .error = EVAL_ERROR_NONE};
-            }
+        // No default or FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER as it's handled as UNARY_OPERATOR
     }
     return (EvalResult){.error = EVAL_ERROR_UNKNOWN};
 }
-
