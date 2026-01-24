@@ -136,6 +136,20 @@ TEST(FormulaParser, PowerFunction)
     DOUBLES_EQUAL(8.0, result, 1e-9);
 }
 
+TEST(FormulaParser, PowerFunctionWithTooManyArguments)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("pow(2, 3, 4)", 0, &result);
+    CHECK_EQUAL(-1, ret);
+}
+
+TEST(FormulaParser, PowerFunctionWithTooFewArguments)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("pow(2)", 0, &result);
+    CHECK_EQUAL(-1, ret);
+}
+
 TEST(FormulaParser, LogFunction)
 {
     double result = 0;
@@ -198,4 +212,25 @@ TEST(FormulaParser, ComplexFormulaWithConstants)
     int ret = parse_and_evaluate("sin(pi/2) + cos(0) * e", 0, &result);
     CHECK_EQUAL(0, ret);
     DOUBLES_EQUAL(1.0 + M_E, result, 1e-9);
+}
+
+TEST(FormulaParser, FormulaWithTrailingWhitespace)
+{
+    Formula * const f = formula_compile("1 ");
+
+    CHECK(f != NULL);
+}
+
+TEST(FormulaParser, FormulaWithTrailingGarbage)
+{
+    Formula * const f = formula_compile("1 blah");
+
+    CHECK(f == NULL);
+}
+
+TEST(FormulaParser, FormulaWithTrailingWhitespaceAfterGarbage)
+{
+    Formula * const f = formula_compile("1 blah ");
+
+    CHECK(f == NULL);
 }

@@ -12,6 +12,7 @@
 typedef enum {
     FORMULA_AST_NODE_TYPE_NUMBER,
     FORMULA_AST_NODE_TYPE_VARIABLE,
+    FORMULA_AST_NODE_TYPE_CONSTANT,
     FORMULA_AST_NODE_TYPE_BINARY_OPERATOR,
     FORMULA_AST_NODE_TYPE_UNARY_OPERATOR,
     FORMULA_AST_NODE_TYPE_FUNCTION_CALL,
@@ -98,6 +99,21 @@ formula_ast_create_variable(const char *name)
 }
 
 static FormulaAST *
+formula_ast_create_constant(const char *name)
+{
+    FormulaAST *node = calloc(1, sizeof(*node));
+    if (node) {
+        node->type = FORMULA_AST_NODE_TYPE_CONSTANT;
+        node->data.variable_name = strdup(name); // Duplicate string, ownership transferred
+        if (!node->data.variable_name) {
+            free(node);
+            return NULL;
+        }
+    }
+    return node;
+}
+
+static FormulaAST *
 formula_ast_create_binary_op(const char *op_name, FormulaAST *left, FormulaAST *right)
 {
     FormulaAST *node = calloc(1, sizeof(*node));
@@ -168,6 +184,7 @@ formula_ast_destroy_internal(FormulaAST *node)
         case FORMULA_AST_NODE_TYPE_NUMBER:
             // No dynamic memory to free
             break;
+        case FORMULA_AST_NODE_TYPE_CONSTANT:
         case FORMULA_AST_NODE_TYPE_VARIABLE:
             free(node->data.variable_name);
             break;
@@ -223,7 +240,7 @@ static mpc_val_t *mpc_make_variable(mpc_val_t *val) {
 // MPC callback for constants: creates a FormulaAST variable node from a string (e.g., "pi", "e").
 static mpc_val_t *mpc_make_constant(mpc_val_t *val) {
     char *name = (char *)val;
-    FormulaAST *node = formula_ast_create_variable(name); // Treat constants as variables for evaluation.
+    FormulaAST *node = formula_ast_create_constant(name);
     free(val); // Free the string value from MPC
     return node;
 }
@@ -429,10 +446,14 @@ eval_error_to_string(EvalError error)
             return "Division by zero";
         case EVAL_ERROR_UNKNOWN_CONSTANT:
             return "Unknown constant";
+        case EVAL_ERROR_UNKNOWN_VARIABLE:
+            return "Unknown variable";
         case EVAL_ERROR_UNKNOWN_OPERATION:
             return "Unknown operation";
         case EVAL_ERROR_NULL_FORMULA:
             return "NULL formula";
+        case EVAL_ERROR_INVALID_ARGUMENTS:
+            return "Invalid arguments";
         case EVAL_ERROR_UNKNOWN:
         default:
             return "Unknown error";
@@ -470,59 +491,112 @@ formula_compile(char const * const formula)
     // Numbers
     mpc_define(f->Float, mpc_apply(mpc_re("[0-9]+\\.[0-9]+"), mpc_make_float));
     mpc_define(f->Int, mpc_apply(mpc_re("[0-9]+"), mpc_make_integer));
-    mpc_define(f->Number, mpc_or(2, mpc_copy(f->Float), mpc_copy(f->Int))); // 'number' just passes through float or int AST
+    mpc_define(
+        f->Number,
+        mpc_or(
+            2,
+            mpc_copy(f->Float),
+            mpc_copy(f->Int)
+        )
+    ); // 'number' just passes through float or int AST
 
     // Variable
-    mpc_define(f->Variable, mpc_apply(mpc_stripl(mpc_string("x")), mpc_make_variable));
+    mpc_define(
+        f->Variable,
+        mpc_apply(mpc_stripl(mpc_string("x")), mpc_make_variable)
+    );
 
     // Constant (treated as variables for evaluation as per current eval logic)
-    mpc_define(f->Constant, mpc_apply(mpc_or(2, mpc_stripl(mpc_string("pi")), mpc_stripl(mpc_string("e"))), mpc_make_constant));
+    mpc_define(
+        f->Constant,
+        mpc_apply(
+            mpc_or(
+                2,
+                mpc_stripl(mpc_string("pi")),
+                mpc_stripl(mpc_string("e"))
+            ),
+            mpc_make_constant
+        )
+    );
 
     // Factor rules: order matters (longest match first)
-    mpc_define(f->Factor, mpc_or(14, // Increased count due to functions and unary minus
-        mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log10")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("acos")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("asin")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("atan")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("cos")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("sin")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
-        mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("tan")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
-        mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("pow")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
-        mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)), // Parenthesized expression
-        mpc_stripl(mpc_copy(f->Number)),    // Number (must be after functions to avoid partial matches)
-        mpc_stripl(mpc_copy(f->Constant)),  // Constant
-        mpc_stripl(mpc_copy(f->Variable))   // Variable
-    ));
+    mpc_define(
+        f->Factor,
+        mpc_or(14, // Increased count due to functions and unary minus
+            mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log10")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log10(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("log")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // log(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("acos")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // acos(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("asin")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // asin(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("atan")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // atan(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("cos")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // cos(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("sin")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // sin(expr)
+            mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("tan")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy), // tan(expr)
+            mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string("pow")), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy), // pow(expr, expr)
+            mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)), // Parenthesized expression
+            mpc_stripl(mpc_copy(f->Number)),    // Number (must be after functions to avoid partial matches)
+            mpc_stripl(mpc_copy(f->Constant)),  // Constant
+            mpc_stripl(mpc_copy(f->Variable))   // Variable
+        )
+    );
 
 
     // Term (multiplication and division)
     // term : <factor> (('*' | '/') <factor>)* ;
-    mpc_define(f->Term, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
-        mpc_copy(f->Factor), // The initial factor
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("*/")), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, factor_ast) parts into a custom array
+    mpc_define(
+        f->Term,
+        mpc_and(
+            2,
+            mpc_fold_left_associative_binary_op,
+            mpc_copy(f->Factor), // The initial factor
+            mpc_many(
+                mpc_collect_binary_op_parts,
+                mpc_and(
+                    2,
+                    mpc_make_binary_op_part,
+                    mpc_stripl(mpc_oneof("*/")),
+                    mpc_copy(f->Factor),
+                    free,
+                    (mpc_dtor_t)formula_ast_destroy
+                )
+            ), // Collects list of (op_str, factor_ast) parts into a custom array
         (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
     ));
 
 
     // Expression (addition and subtraction)
     // expr : <term> (('+' | '-') <term>)* ;
-    mpc_define(f->Expr, mpc_and(2, (mpc_fold_t)mpc_fold_left_associative_binary_op,
-        mpc_copy(f->Term), // The initial term
-        mpc_many((mpc_fold_t)mpc_collect_binary_op_parts, mpc_and(2, (mpc_fold_t)mpc_make_binary_op_part, mpc_stripl(mpc_oneof("+-")), mpc_copy(f->Term), free, (mpc_dtor_t)formula_ast_destroy)), // Collects list of (op_str, term_ast) parts into a custom array
-        (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
-    ));
+    mpc_define(
+        f->Expr,
+        mpc_and(
+            2,
+            mpc_fold_left_associative_binary_op,
+            mpc_copy(f->Term), // The initial term
+            mpc_many(
+                mpc_collect_binary_op_parts,
+                mpc_and(
+                    2,
+                    mpc_make_binary_op_part,
+                    mpc_stripl(mpc_oneof("+-")),
+                    mpc_copy(f->Term),
+                    free, (mpc_dtor_t)formula_ast_destroy)
+                ), // Collects list of (op_str, term_ast) parts into a custom array
+            (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
+        )
+    );
 
     // Formula (start and end of input)
-    mpc_define(f->Formula, mpc_and(3,
-                                   mpcf_snd_free,
-                                   mpc_soi(),
-                                   mpc_copy(f->Expr),
-                                   mpc_eoi(),
-                                   mpcf_dtor_null,
-                                   (mpc_dtor_t)formula_ast_destroy)
-               ); // Keep only the Expr AST
+    mpc_define(
+        f->Formula,
+        mpc_and(3,
+           mpcf_snd_free,
+           mpc_soi(),
+           mpc_stripr(mpc_copy(f->Expr)),
+           mpc_eoi(),
+           mpcf_dtor_null,
+           (mpc_dtor_t)formula_ast_destroy
+        )
+    ); // Keep only the Expr AST
 
     mpc_result_t parse_result = {0};
 
@@ -537,7 +611,18 @@ formula_compile(char const * const formula)
         mpc_err_print(parse_result.error);
         mpc_err_delete(parse_result.error);
         /* Cleanup the parsers before freeing the context */
-        mpc_cleanup(9, f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
+        mpc_cleanup(
+            9,
+            f->Float,
+            f->Int,
+            f->Number,
+            f->Variable,
+            f->Constant,
+            f->Factor,
+            f->Term,
+            f->Expr,
+            f->Formula
+        );
         free(f);
         return NULL;
     }
@@ -624,16 +709,18 @@ eval_ast(FormulaAST const * const tree, double const x_value)
     switch (tree->type) {
         case FORMULA_AST_NODE_TYPE_NUMBER:
             return (EvalResult){.value = tree->data.number_value, .error = EVAL_ERROR_NONE};
-        case FORMULA_AST_NODE_TYPE_VARIABLE:
-            if (strcmp(tree->data.variable_name, "x") == 0) {
-                return (EvalResult){.value = x_value, .error = EVAL_ERROR_NONE};
-            } else if (strcmp(tree->data.variable_name, "pi") == 0) {
+        case FORMULA_AST_NODE_TYPE_CONSTANT:
+            if (strcmp(tree->data.variable_name, "pi") == 0) {
                 return (EvalResult){.value = M_PI, .error = EVAL_ERROR_NONE};
             } else if (strcmp(tree->data.variable_name, "e") == 0) {
                 return (EvalResult){.value = M_E, .error = EVAL_ERROR_NONE};
-            } else {
-                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT}; // For unknown variables
             }
+            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT}; // For unknown constants
+        case FORMULA_AST_NODE_TYPE_VARIABLE:
+            if (strcmp(tree->data.variable_name, "x") == 0) {
+                return (EvalResult){.value = x_value, .error = EVAL_ERROR_NONE};
+            }
+            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_VARIABLE}; // For unknown variables
         case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
             {
                 EvalResult left_res = eval_ast(tree->data.binary_op.left, x_value);
@@ -697,7 +784,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
 
                 // Multi-argument functions
                 if (strcmp(func_name, "pow") == 0) {
-                    if (num_args != 2) { free(arg_results); return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION}; } // Pow expects 2 args
+                    if (num_args != 2) { free(arg_results); return (EvalResult){.error = EVAL_ERROR_INVALID_ARGUMENTS}; } // Pow expects 2 args
                     EvalResult res = (EvalResult){.value = pow(arg_results[0].value, arg_results[1].value), .error = EVAL_ERROR_NONE};
                     free(arg_results);
                     return res;
