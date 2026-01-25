@@ -1,6 +1,7 @@
-#include <formula_parser.h>
+#include "formula_parser.h"
+#include "utils.h"
 
-#include "mpc.h"
+#include <mpc.h>
 
 #include <math.h>
 #include <stdbool.h>
@@ -71,6 +72,214 @@ struct FormulaContext
     /* Custom AST */
     FormulaAST * ast;
 };
+
+
+typedef struct constant_t {
+    char const * name;
+    double value;
+} constant_t;
+
+typedef bool (*constants_foreach_cb)(constant_t const * constant, void * ctx);
+
+static constant_t constants[] =
+{
+    {
+        .name = "pi",
+        .value = M_PI,
+    },
+    {
+        .name = "e",
+        .value = M_E,
+    },
+};
+
+static constant_t const *
+constants_foreach(constants_foreach_cb const cb, void * const user_ctx)
+{
+    for (size_t i = 0; i < ARRAY_SIZE(constants); i++)
+    {
+        constant_t const * const candidate = &constants[i];
+
+        if (cb(candidate, user_ctx))
+        {
+            return candidate;
+        }
+    }
+
+    return NULL;
+}
+
+static bool
+constant_name_matches(constant_t const * const constant, void * const user_ctx)
+{
+    char const * const name = user_ctx;
+    bool const name_matches = strcmp(constant->name, name) == 0;
+
+    return name_matches;
+}
+
+static constant_t const *
+constant_lookup_by_name(char const * const name)
+{
+    constant_t const * const constant = constants_foreach(constant_name_matches, (void *)name);
+
+    return constant;
+}
+
+static double
+func_cos(double const val)
+{
+    return cos(val);
+}
+
+static double
+func_sin(double const val)
+{
+    return sin(val);
+}
+
+static double
+func_tan(double const val)
+{
+    return tan(val);
+}
+
+static double
+func_acos(double const val)
+{
+    return acos(val);
+}
+
+static double
+func_asin(double const val)
+{
+    return asin(val);
+}
+
+static double
+func_atan(double const val)
+{
+    return atan(val);
+}
+
+static double
+func_log10(double const val)
+{
+    return log10(val);
+}
+
+static double
+func_log(double const val)
+{
+    return log(val);
+}
+
+static double
+func_pow(double const val, double exp)
+{
+    return pow(val, exp);
+}
+
+static double
+func_sqrt(double const val)
+{
+    return sqrt(val);
+}
+
+typedef struct function_t {
+    char const * name;
+    size_t num_args;
+    double (*fn)();
+} function_t;
+
+typedef bool (*functions_foreach_cb)(function_t const * func, void * ctx);
+
+static function_t functions[] =
+{
+    {
+        .name = "cos",
+        .num_args = 1,
+        func_cos,
+    },
+    {
+        .name = "sin",
+        .num_args = 1,
+        func_sin,
+    },
+    {
+        .name = "tan",
+        .num_args = 1,
+        func_tan,
+    },
+    {
+        .name = "acos",
+        .num_args = 1,
+        func_acos,
+    },
+    {
+        .name = "asin",
+        .num_args = 1,
+        func_asin,
+    },
+    {
+        .name = "atan",
+        .num_args = 1,
+        func_atan,
+    },
+    {
+        .name = "log10",
+        .num_args = 1,
+        func_log10,
+    },
+    {
+        .name = "log",
+        .num_args = 1,
+        func_log,
+    },
+    {
+        .name = "sqrt",
+        .num_args = 1,
+        func_sqrt,
+    },
+    {
+        .name = "pow",
+        .num_args = 2,
+        func_pow,
+    },
+};
+
+static function_t const *
+functions_foreach(functions_foreach_cb const cb, void * const user_ctx)
+{
+    for (size_t i = 0; i < ARRAY_SIZE(functions); i++)
+    {
+        function_t const * const candidate = &functions[i];
+
+        if (cb(candidate, user_ctx))
+        {
+            return candidate;
+        }
+    }
+
+    return NULL;
+}
+
+static bool
+function_name_matches(function_t const * const func, void * const user_ctx)
+{
+    char const * const name = user_ctx;
+    bool const name_matches = strcmp(func->name, name) == 0;
+
+    return name_matches;
+}
+
+static function_t const *
+function_lookup_by_name(char const * const name)
+{
+    function_t const * const func = functions_foreach(function_name_matches, (void *)name);
+
+    return func;
+}
 
 static FormulaAST *
 formula_ast_create_number(double value)
@@ -490,7 +699,7 @@ formula_compile(char const * const formula)
         mpc_apply(mpc_stripl(mpc_string("x")), mpc_make_variable)
     );
 
-    // Constant (treated as variables for evaluation as per current eval logic)
+    // Constant
     mpc_define(
         f->Constant,
         mpc_apply(
@@ -671,7 +880,6 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
     return 0;
 }
 
-
 /*
  * @brief Recursively evaluates the Abstract Syntax Tree (AST).
  *
@@ -694,12 +902,15 @@ eval_ast(FormulaAST const * const tree, double const x_value)
         case FORMULA_AST_NODE_TYPE_NUMBER:
             return (EvalResult){.value = tree->data.number_value, .error = EVAL_ERROR_NONE};
         case FORMULA_AST_NODE_TYPE_CONSTANT:
-            if (strcmp(tree->data.variable_name, "pi") == 0) {
-                return (EvalResult){.value = M_PI, .error = EVAL_ERROR_NONE};
-            } else if (strcmp(tree->data.variable_name, "e") == 0) {
-                return (EvalResult){.value = M_E, .error = EVAL_ERROR_NONE};
+        {
+            constant_t const * const constant = constant_lookup_by_name(tree->data.variable_name);
+
+            if (constant == NULL)
+            {
+                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT}; // For unknown constants
             }
-            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT}; // For unknown constants
+            return (EvalResult){.value = constant->value, .error = EVAL_ERROR_NONE};
+        }
         case FORMULA_AST_NODE_TYPE_VARIABLE:
             if (strcmp(tree->data.variable_name, "x") == 0) {
                 return (EvalResult){.value = x_value, .error = EVAL_ERROR_NONE};
@@ -741,6 +952,15 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 size_t num_args = tree->data.function_call.num_args;
                 FormulaAST * const *args = tree->data.function_call.args;
 
+                function_t const * func = function_lookup_by_name(func_name);
+                if (func == NULL)
+                {
+                    return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
+                }
+                if (func->num_args != num_args)
+                {
+                    return (EvalResult) { .error = EVAL_ERROR_INVALID_ARGUMENTS };
+                }
                 // Evaluate arguments
                 EvalResult *arg_results = calloc(num_args, sizeof(EvalResult));
                 if (!arg_results) return (EvalResult){.error = EVAL_ERROR_UNKNOWN};
@@ -757,26 +977,16 @@ eval_ast(FormulaAST const * const tree, double const x_value)
                 // Single argument functions
                 if (num_args == 1) {
                     double arg_val = arg_results[0].value;
-                    if (strcmp(func_name, "cos") == 0) { free(arg_results); return (EvalResult){.value = cos(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "sin") == 0) { free(arg_results); return (EvalResult){.value = sin(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "tan") == 0) { free(arg_results); return (EvalResult){.value = tan(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "acos") == 0) { free(arg_results); return (EvalResult){.value = acos(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "asin") == 0) { free(arg_results); return (EvalResult){.value = asin(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "atan") == 0) { free(arg_results); return (EvalResult){.value = atan(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "log") == 0) { free(arg_results); return (EvalResult){.value = log(arg_val), .error = EVAL_ERROR_NONE}; }
-                    else if (strcmp(func_name, "log10") == 0) { free(arg_results); return (EvalResult){.value = log10(arg_val), .error = EVAL_ERROR_NONE}; }
-                }
-
-                // Multi-argument functions
-                if (strcmp(func_name, "pow") == 0) {
-                    if (num_args != 2)
-                    {
-                        free(arg_results);
-                        return (EvalResult){.error = EVAL_ERROR_INVALID_ARGUMENTS};
-                    } // Pow expects 2 args
-                    EvalResult res = (EvalResult){.value = pow(arg_results[0].value, arg_results[1].value), .error = EVAL_ERROR_NONE};
+                    double const res = func->fn(arg_val);
                     free(arg_results);
-                    return res;
+                    return (EvalResult){.value = res, .error = EVAL_ERROR_NONE};
+                }
+                if (num_args == 2) {
+                    double const arg1_val = arg_results[0].value;
+                    double const arg2_val = arg_results[1].value;
+                    double const res = func->fn(arg1_val, arg2_val);
+                    free(arg_results);
+                    return (EvalResult){.value = res, .error = EVAL_ERROR_NONE};
                 }
                 free(arg_results);
                 return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
