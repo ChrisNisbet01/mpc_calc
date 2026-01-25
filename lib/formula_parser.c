@@ -653,68 +653,6 @@ eval_error_to_string(EvalError error)
     }
 }
 
-static bool
-constant_parse_cb(constant_t const * const constant, void * const user_ctx)
-{
-    mpc_parser_t * * Constant_or = user_ctx;
-    if (*Constant_or == NULL)
-    {
-        *Constant_or = mpc_stripl(mpc_string(constant->name));
-    } else {
-        *Constant_or = mpc_or(2, *Constant_or, mpc_stripl(mpc_string(constant->name)));
-    }
-
-    return false;
-}
-
-typedef struct function_or_cb_ctx
-{
-    Formula *f;
-    mpc_parser_t *Function_or;
-} function_or_cb_ctx;
-
-static bool
-function_parse_cb(function_t const * const func, void * const user_ctx)
-{
-    function_or_cb_ctx * const ctx = user_ctx;
-    Formula * const f = ctx->f;
-
-    if (ctx->Function_or == NULL)
-    {
-        if (func->num_args == 1)
-        {
-            ctx->Function_or =
-                mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy);
-        }
-        else if (func->num_args == 2)
-        {
-            ctx->Function_or =
-                mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy);
-        }
-    }
-    else
-    {
-        if (func->num_args == 1)
-        {
-            ctx->Function_or = mpc_or(
-                2,
-                ctx->Function_or,
-                mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy)
-            );
-        }
-        else if (func->num_args == 2)
-        {
-            ctx->Function_or = mpc_or(
-                2,
-                ctx->Function_or,
-                mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy)
-            );
-        }
-    }
-
-    return false;
-}
-
 /*
  * See header file for documentation.
  */
@@ -762,21 +700,53 @@ formula_compile(char const * const formula)
     );
 
     // Constant
-    mpc_parser_t *Constant_or = NULL;
-    constants_foreach(constant_parse_cb, &Constant_or);
-
-    if (Constant_or != NULL)
+    mpc_parser_t * Constant_or = mpc_stripl(mpc_string(constants[0].name));
+    for (size_t i = 1; i < ARRAY_SIZE(constants); i++)
     {
-        mpc_define(f->Constant, mpc_apply(Constant_or, mpc_make_constant));
+        Constant_or = mpc_or(2, Constant_or, mpc_stripl(mpc_string(constants[i].name)));
+    }
+    mpc_define(f->Constant, mpc_apply(Constant_or, mpc_make_constant));
+
+    mpc_parser_t * Function_or = NULL;
+    for (size_t i = 0; i < ARRAY_SIZE(functions); i++)
+    {
+        function_t const * const func = &functions[i];
+
+        if (Function_or == NULL)
+        {
+            if (func->num_args == 1)
+            {
+                Function_or =
+                    mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy);
+            }
+            else if (func->num_args == 2)
+            {
+                Function_or =
+                    mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy);
+            }
+        }
+        else
+        {
+            if (func->num_args == 1)
+            {
+                Function_or = mpc_or(
+                    2,
+                    Function_or,
+                    mpc_and(4, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy)
+                );
+            }
+            else if (func->num_args == 2)
+            {
+                Function_or = mpc_or(
+                    2,
+                    Function_or,
+                    mpc_and(6, (mpc_fold_t)mpc_make_function_call, mpc_stripl(mpc_string(func->name)), mpc_stripl(mpc_char('(')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(',')), mpc_stripl(mpc_copy(f->Expr)), mpc_stripl(mpc_char(')')), free, free, (mpc_dtor_t)formula_ast_destroy, free, (mpc_dtor_t)formula_ast_destroy)
+                );
+            }
+        }
     }
 
-    function_or_cb_ctx cb_ctx = {
-        .f = f,
-    };
-
-    functions_foreach(function_parse_cb, &cb_ctx);
-
-    if (cb_ctx.Function_or == NULL)
+    if (Function_or == NULL)
     {
         mpc_define(
             f->Factor,
@@ -795,7 +765,7 @@ formula_compile(char const * const formula)
             f->Factor,
             mpc_or(6,
                 mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
-                cb_ctx.Function_or,
+                Function_or,
                 mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)), // Parenthesized expression
                 mpc_stripl(mpc_copy(f->Number)),    // Number (must be after functions to avoid partial matches)
                 mpc_stripl(mpc_copy(f->Constant)),  // Constant
