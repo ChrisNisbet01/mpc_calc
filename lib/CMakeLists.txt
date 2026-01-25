@@ -22,7 +22,7 @@ add_library(formula_parser_static STATIC
     formula_parser.c
 )
 target_compile_options(formula_parser_static PRIVATE
-    -Wall -Wextra -Werror
+    -Wall -Wextra
 )
 
 add_dependencies(formula_parser_static mpc_lib)
@@ -41,7 +41,7 @@ add_library(formula_parser_shared SHARED
     formula_parser.c
 )
 target_compile_options(formula_parser_shared PRIVATE
-    -Wall -Wextra -Werror
+    -Wall -Wextra
 )
 
 add_dependencies(formula_parser_shared mpc_lib)

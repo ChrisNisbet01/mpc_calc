@@ -206,6 +206,30 @@ TEST(FormulaParser, EConstant)
     DOUBLES_EQUAL(M_E, result, 1e-9);
 }
 
+TEST(FormulaParser, FormulaWithConstant)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("sin(pi/2) + e", 0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(1.0 + M_E, result, 1e-9);
+}
+
+TEST(FormulaParser, ComplexFormula)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("sin(pi/2) + cos(0)", 0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(2.0, result, 1e-9);
+}
+
+TEST(FormulaParser, ComplexFormulaNoSpaceAfterPlus)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("sin(pi/2) +cos(0)", 0, &result);
+    CHECK_EQUAL(0, ret);
+    DOUBLES_EQUAL(2.0, result, 1e-9);
+}
+
 TEST(FormulaParser, ComplexFormulaWithConstants)
 {
     double result = 0;
@@ -233,4 +257,38 @@ TEST(FormulaParser, FormulaWithTrailingWhitespaceAfterGarbage)
     Formula * const f = formula_compile("1 blah ");
 
     CHECK(f == NULL);
+}
+
+TEST(FormulaParser, CosZeroSeparateCompileandEval)
+{
+    Formula * const f = formula_compile("cos(0)");
+    CHECK(f != NULL);
+
+    double x = 0;
+    EvalResult const eval_result = formula_evaluate(f, 0);
+    CHECK(eval_result.error == EVAL_ERROR_NONE);
+
+
+    formula_cleanup(f);
+}
+
+TEST(FormulaParser, NonExistentFunction)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("non_existent_func(1)", 0, &result);
+    CHECK_EQUAL(-1, ret);
+}
+
+TEST(FormulaParser, SingleArgFunctionTooManyArgs)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("sin(1, 2)", 0, &result);
+    CHECK_EQUAL(-1, ret);
+}
+
+TEST(FormulaParser, MultiArgFunctionTooFewArgs)
+{
+    double result = 0;
+    int ret = parse_and_evaluate("pow()", 0, &result);
+    CHECK_EQUAL(-1, ret);
 }
