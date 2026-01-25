@@ -9,12 +9,16 @@ extern "C"
 
 TEST_GROUP(FormulaParser)
 {
+    Formula * f = NULL;
+
     void setup()
     {
     }
 
     void teardown()
     {
+        formula_cleanup(f);
+        f = NULL;
     }
 };
 
@@ -76,18 +80,17 @@ TEST(FormulaParser, NegativeNumbers)
 
 TEST(FormulaParser, EvaluateSameFormulaMultipleTimes)
 {
-    Formula* formula = formula_compile("x*x");
-    CHECK_TRUE(formula != NULL);
+    f = formula_compile("x*x");
+    CHECK_TRUE(f != NULL);
+    POINTERS_EQUAL(formula_get_last_error(f), NULL);
 
-    EvalResult result = formula_evaluate(formula, 2.0);
+    EvalResult result = formula_evaluate(f, 2.0);
     CHECK_EQUAL(EVAL_ERROR_NONE, result.error);
     DOUBLES_EQUAL(4.0, result.value, 1e-9);
 
-    result = formula_evaluate(formula, 3.0);
+    result = formula_evaluate(f, 3.0);
     CHECK_EQUAL(EVAL_ERROR_NONE, result.error);
     DOUBLES_EQUAL(9.0, result.value, 1e-9);
-
-    formula_cleanup(formula);
 }
 
 TEST(FormulaParser, DivisionByZero)
@@ -240,36 +243,37 @@ TEST(FormulaParser, ComplexFormulaWithConstants)
 
 TEST(FormulaParser, FormulaWithTrailingWhitespace)
 {
-    Formula * const f = formula_compile("1 ");
+    f = formula_compile("1 ");
 
     CHECK(f != NULL);
+    POINTERS_EQUAL(formula_get_last_error(f), NULL);
 }
 
 TEST(FormulaParser, FormulaWithTrailingGarbage)
 {
-    Formula * const f = formula_compile("1 blah");
+    f = formula_compile("1 blah");
 
-    CHECK(f == NULL);
+    CHECK(f != NULL);
+    CHECK(formula_get_last_error(f) != NULL);
 }
 
 TEST(FormulaParser, FormulaWithTrailingWhitespaceAfterGarbage)
 {
-    Formula * const f = formula_compile("1 blah ");
+    f = formula_compile("1 blah ");
 
-    CHECK(f == NULL);
+    CHECK(f != NULL);
+    CHECK(formula_get_last_error(f) != NULL);
 }
 
 TEST(FormulaParser, CosZeroSeparateCompileandEval)
 {
-    Formula * const f = formula_compile("cos(0)");
+    f = formula_compile("cos(0)");
     CHECK(f != NULL);
+    POINTERS_EQUAL(formula_get_last_error(f), NULL);
 
     double x = 0;
     EvalResult const eval_result = formula_evaluate(f, 0);
     CHECK(eval_result.error == EVAL_ERROR_NONE);
-
-
-    formula_cleanup(f);
 }
 
 TEST(FormulaParser, NonExistentFunction)
