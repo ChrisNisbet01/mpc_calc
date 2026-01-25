@@ -10,7 +10,8 @@
 #include <string.h>
 
 // Internal structure for FormulaAST
-typedef enum {
+typedef enum
+{
     FORMULA_AST_NODE_TYPE_NUMBER,
     FORMULA_AST_NODE_TYPE_VARIABLE,
     FORMULA_AST_NODE_TYPE_CONSTANT,
@@ -19,30 +20,35 @@ typedef enum {
     FORMULA_AST_NODE_TYPE_FUNCTION_CALL,
 } FormulaASTNodeType;
 
-struct FormulaAST {
+struct FormulaAST
+{
     FormulaASTNodeType type;
-    union {
+    union
+    {
         double number_value;
-        char *variable_name; // owned by this struct
-        struct {
-            char *operator_name; // owned by this struct
-            struct FormulaAST *left; // owned by this struct
-            struct FormulaAST *right; // owned by this struct
+        char * variable_name; // owned by this struct
+        struct
+        {
+            char * operator_name; // owned by this struct
+            struct FormulaAST * left; // owned by this struct
+            struct FormulaAST * right; // owned by this struct
         } binary_op;
-        struct {
-            char *operator_name; // owned by this struct
-            struct FormulaAST *child; // owned by this struct
+        struct
+        {
+            char * operator_name; // owned by this struct
+            struct FormulaAST * child; // owned by this struct
         } unary_op;
-        struct {
-            char *function_name; // owned by this struct
-            struct FormulaAST **args; // array of owned pointers
+        struct
+        {
+            char * function_name; // owned by this struct
+            struct FormulaAST ** args; // array of owned pointers
             size_t num_args;
         } function_call;
     } data;
 };
 
 // Forward declaration of internal AST destruction function
-static void formula_ast_destroy_internal(FormulaAST *node);
+static void formula_ast_destroy_internal(FormulaAST * node);
 
 /*
  * Forward declarations for AST evaluation.
@@ -71,7 +77,8 @@ struct FormulaContext
     FormulaAST * ast;
 };
 
-typedef struct constant_t {
+typedef struct constant_t
+{
     char const * name;
     double value;
 } constant_t;
@@ -118,7 +125,8 @@ constant_name_matches(constant_t const * const constant, void * const user_ctx)
 static constant_t const *
 constant_lookup_by_name(char const * const name)
 {
-    constant_t const * const constant = constants_foreach(constant_name_matches, (void *)name);
+    constant_t const * const constant =
+        constants_foreach(constant_name_matches, (void *)name);
 
     return constant;
 }
@@ -183,10 +191,11 @@ func_sqrt(double const val)
     return sqrt(val);
 }
 
-typedef struct function_t {
+typedef struct function_t
+{
     char const * name;
     size_t num_args;
-    double (*fn)();
+    double (*fn)(); /* Don't specify parameters as the functions take different numbers of them.*/
 } function_t;
 
 typedef bool (*functions_foreach_cb)(function_t const * func, void * ctx);
@@ -273,7 +282,8 @@ function_name_matches(function_t const * const func, void * const user_ctx)
 static function_t const *
 function_lookup_by_name(char const * const name)
 {
-    function_t const * const func = functions_foreach(function_name_matches, (void *)name);
+    function_t const * const func =
+        functions_foreach(function_name_matches, (void *)name);
 
     return func;
 }
@@ -281,8 +291,9 @@ function_lookup_by_name(char const * const name)
 static FormulaAST *
 formula_ast_create_number(double value)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_NUMBER;
         node->data.number_value = value;
     }
@@ -290,13 +301,16 @@ formula_ast_create_number(double value)
 }
 
 static FormulaAST *
-formula_ast_create_variable(const char *name)
+formula_ast_create_variable(const char * name)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_VARIABLE;
-        node->data.variable_name = strdup(name); // Duplicate string, ownership transferred
-        if (!node->data.variable_name) {
+        // Duplicate string as caller frees the passed variable
+        node->data.variable_name = strdup(name);
+        if (!node->data.variable_name)
+        {
             free(node);
             return NULL;
         }
@@ -305,13 +319,16 @@ formula_ast_create_variable(const char *name)
 }
 
 static FormulaAST *
-formula_ast_create_constant(const char *name)
+formula_ast_create_constant(const char * name)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_CONSTANT;
-        node->data.variable_name = strdup(name); // Duplicate string, ownership transferred
-        if (!node->data.variable_name) {
+        // Duplicate string as caller frees the passed variable
+        node->data.variable_name = strdup(name);
+        if (!node->data.variable_name)
+        {
             free(node);
             return NULL;
         }
@@ -320,34 +337,39 @@ formula_ast_create_constant(const char *name)
 }
 
 static FormulaAST *
-formula_ast_create_binary_op(const char *op_name, FormulaAST *left, FormulaAST *right)
+formula_ast_create_binary_op(const char * op_name, FormulaAST * left, FormulaAST * right)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_BINARY_OPERATOR;
         node->data.binary_op.operator_name = strdup(op_name); // Duplicate string
-        node->data.binary_op.left = left;
-        node->data.binary_op.right = right;
-        if (!node->data.binary_op.operator_name) {
+        if (!node->data.binary_op.operator_name)
+        {
             // Cleanup on allocation failure
             formula_ast_destroy_internal(left);
             formula_ast_destroy_internal(right);
             free(node);
             return NULL;
         }
+        node->data.binary_op.left = left;
+        node->data.binary_op.right = right;
     }
     return node;
 }
 
 static FormulaAST *
-formula_ast_create_unary_op(const char *op_name, FormulaAST *child)
+formula_ast_create_unary_op(const char * op_name, FormulaAST * child)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_UNARY_OPERATOR;
-        node->data.unary_op.operator_name = strdup(op_name); // Duplicate string
+        // Duplicate string as caller frees the passed name.
+        node->data.unary_op.operator_name = strdup(op_name);
         node->data.unary_op.child = child;
-        if (!node->data.unary_op.operator_name) {
+        if (!node->data.unary_op.operator_name)
+        {
             // Cleanup on allocation failure
             formula_ast_destroy_internal(child);
             free(node);
@@ -358,124 +380,142 @@ formula_ast_create_unary_op(const char *op_name, FormulaAST *child)
 }
 
 static FormulaAST *
-formula_ast_create_function_call(const char *func_name, FormulaAST **args, size_t num_args)
+formula_ast_create_function_call(const char * func_name, FormulaAST ** args, size_t num_args)
 {
-    FormulaAST *node = calloc(1, sizeof(*node));
-    if (node) {
+    FormulaAST * node = calloc(1, sizeof(*node));
+    if (node)
+    {
         node->type = FORMULA_AST_NODE_TYPE_FUNCTION_CALL;
-        node->data.function_call.function_name = strdup(func_name); // Duplicate string
-        node->data.function_call.args = args; // Takes ownership of the array of pointers
-        node->data.function_call.num_args = num_args;
-        if (!node->data.function_call.function_name) {
+        // Duplicate string as caller frees the passed name.
+        node->data.function_call.function_name = strdup(func_name);
+        if (!node->data.function_call.function_name)
+        {
             // Cleanup on allocation failure
-            for (size_t i = 0; i < num_args; ++i) {
+            for (size_t i = 0; i < num_args; ++i)
+            {
                 formula_ast_destroy_internal(args[i]);
             }
             free(args);
             free(node);
             return NULL;
         }
+        node->data.function_call.args = args; // Takes ownership of the array of pointers
+        node->data.function_call.num_args = num_args;
     }
     return node;
 }
 
 static void
-formula_ast_destroy_internal(FormulaAST *node)
+formula_ast_destroy_internal(FormulaAST * node)
 {
-    if (NULL == node) {
+    if (NULL == node)
+    {
         return;
     }
 
-    switch (node->type) {
-        case FORMULA_AST_NODE_TYPE_NUMBER:
-            // No dynamic memory to free
-            break;
-        case FORMULA_AST_NODE_TYPE_CONSTANT:
-        case FORMULA_AST_NODE_TYPE_VARIABLE:
-            free(node->data.variable_name);
-            break;
-        case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
-            free(node->data.binary_op.operator_name);
-            formula_ast_destroy_internal(node->data.binary_op.left);
-            formula_ast_destroy_internal(node->data.binary_op.right);
-            break;
-        case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
-            free(node->data.unary_op.operator_name);
-            formula_ast_destroy_internal(node->data.unary_op.child);
-            break;
-        case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
-            free(node->data.function_call.function_name);
-            for (size_t i = 0; i < node->data.function_call.num_args; ++i) {
-                formula_ast_destroy_internal(node->data.function_call.args[i]);
-            }
-            free(node->data.function_call.args);
-            break;
+    switch (node->type)
+    {
+    case FORMULA_AST_NODE_TYPE_NUMBER:
+        // No dynamic memory to free
+        break;
+    case FORMULA_AST_NODE_TYPE_CONSTANT:
+    case FORMULA_AST_NODE_TYPE_VARIABLE:
+        free(node->data.variable_name);
+        break;
+    case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
+        free(node->data.binary_op.operator_name);
+        formula_ast_destroy_internal(node->data.binary_op.left);
+        formula_ast_destroy_internal(node->data.binary_op.right);
+        break;
+    case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
+        free(node->data.unary_op.operator_name);
+        formula_ast_destroy_internal(node->data.unary_op.child);
+        break;
+    case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
+        free(node->data.function_call.function_name);
+        for (size_t i = 0; i < node->data.function_call.num_args; ++i)
+        {
+            formula_ast_destroy_internal(node->data.function_call.args[i]);
+        }
+        free(node->data.function_call.args);
+        break;
     }
     free(node);
 }
 
 // Public API wrapper for the internal destructor
 void
-formula_ast_destroy(FormulaAST *ast)
+formula_ast_destroy(FormulaAST * ast)
 {
     formula_ast_destroy_internal(ast);
 }
 
 // MPC callback for numbers: converts a string to a double and creates a FormulaAST number node.
-static mpc_val_t *mpc_make_float(mpc_val_t *val) {
+static mpc_val_t * mpc_make_float(mpc_val_t * val)
+{
     double value = atof((char *)val);
-    free(val); // Free the string value from MPC
+    free(val);
     return formula_ast_create_number(value);
 }
 
-static mpc_val_t *mpc_make_integer(mpc_val_t *val) {
+static mpc_val_t * mpc_make_integer(mpc_val_t * val)
+{
     double value = atof((char *)val);
-    free(val); // Free the string value from MPC
+    free(val);
     return formula_ast_create_number(value);
 }
 
 // MPC callback for variables: creates a FormulaAST variable node from a string.
-static mpc_val_t *mpc_make_variable(mpc_val_t *val) {
-    char *name = (char *)val;
-    FormulaAST *node = formula_ast_create_variable(name);
-    free(val); // Free the string value from MPC
+static mpc_val_t * mpc_make_variable(mpc_val_t * val)
+{
+    char * name = (char *)val;
+    FormulaAST * node = formula_ast_create_variable(name);
+    free(val);
     return node;
 }
 
 // MPC callback for constants: creates a FormulaAST variable node from a string (e.g., "pi", "e").
-static mpc_val_t *mpc_make_constant(mpc_val_t *val) {
-    char *name = (char *)val;
-    FormulaAST *node = formula_ast_create_constant(name);
-    free(val); // Free the string value from MPC
+static mpc_val_t * mpc_make_constant(mpc_val_t * val)
+{
+    char * name = (char *)val;
+    FormulaAST * node = formula_ast_create_constant(name);
+    free(val);
     return node;
 }
 
 // MPC fold callback for unary operators like negation
-static mpc_val_t *mpc_make_unary_op_fold(int n_args, mpc_val_t **args) {
+static mpc_val_t * mpc_make_unary_op_fold(int n_args, mpc_val_t ** args)
+{
     // Expects: [op_str, child_ast]
-    if (n_args != 2) {
-        if (args[0]) free(args[0]);
-        if (args[1]) formula_ast_destroy_internal((FormulaAST*)args[1]);
+    if (n_args != 2)
+    {
+        if (args[0])
+            free(args[0]);
+        if (args[1])
+            formula_ast_destroy_internal((FormulaAST *)args[1]);
         return NULL; // Error
     }
-    char *op_name = (char *)args[0];
-    FormulaAST *child = (FormulaAST *)args[1];
-    FormulaAST *node = formula_ast_create_unary_op(op_name, child);
-    free(op_name); // Free the operator string from MPC
+    char * op_name = (char *)args[0];
+    FormulaAST * child = (FormulaAST *)args[1];
+    FormulaAST * node = formula_ast_create_unary_op(op_name, child);
+    free(op_name);
     return node;
 }
 
 // Struct to hold an operator string and its corresponding operand AST node
 // This struct is internal to the handling of binary operations.
-typedef struct {
-    char *op_name;
-    FormulaAST *operand;
+typedef struct
+{
+    char * op_name;
+    FormulaAST * operand;
 } BinaryOpPart;
 
 // Destructor for BinaryOpPart
-static void mpc_destroy_binary_op_part(mpc_val_t *val) {
-    BinaryOpPart *part = (BinaryOpPart *)val;
-    if (part) {
+static void mpc_destroy_binary_op_part(mpc_val_t * val)
+{
+    BinaryOpPart * part = (BinaryOpPart *)val;
+    if (part)
+    {
         free(part->op_name);
         formula_ast_destroy_internal(part->operand);
         free(part);
@@ -484,20 +524,29 @@ static void mpc_destroy_binary_op_part(mpc_val_t *val) {
 
 // MPC fold callback for the inner mpc_and (e.g., ("*" <factor>))
 // It combines the operator string and the operand AST into a BinaryOpPart struct.
-static mpc_val_t *mpc_make_binary_op_part(int n_args, mpc_val_t **args) {
+static mpc_val_t * mpc_make_binary_op_part(int n_args, mpc_val_t ** args)
+{
     // Expects: [op_str, operand_ast]. n_args should be 2.
-    if (n_args != 2) {
+    if (n_args != 2)
+    {
         // This should not happen with correct grammar
-        if (args[0]) free(args[0]);
-        if (args[1]) formula_ast_destroy_internal((FormulaAST*)args[1]);
+        if (args[0])
+        {
+            free(args[0]);
+        }
+        if (args[1])
+        {
+            formula_ast_destroy_internal((FormulaAST *)args[1]);
+        }
         return NULL;
     }
 
-    char *op_name = (char *)args[0]; // Takes ownership from mpc parser
-    FormulaAST *operand_ast = (FormulaAST *)args[1]; // Takes ownership from mpc parser
+    char * op_name = (char *)args[0];
+    FormulaAST * operand_ast = (FormulaAST *)args[1];
 
-    BinaryOpPart *part = malloc(sizeof(BinaryOpPart));
-    if (!part) {
+    BinaryOpPart * part = calloc(1, sizeof(*part));
+    if (!part)
+    {
         free(op_name);
         formula_ast_destroy_internal(operand_ast);
         return NULL;
@@ -511,13 +560,16 @@ static mpc_val_t *mpc_make_binary_op_part(int n_args, mpc_val_t **args) {
 // Custom fold function for mpc_many in Term and Expr rules.
 // This function collects a list of BinaryOpPart* into a dynamically sized array (void**)
 // The returned mpc_val_t* will be a (BinaryOpPart**) cast to mpc_val_t*.
-static mpc_val_t *mpc_collect_binary_op_parts(int n_args, mpc_val_t **args) {
+static mpc_val_t * mpc_collect_binary_op_parts(int n_args, mpc_val_t ** args)
+{
     // args is an array of BinaryOpPart*
     // We need to return an array of BinaryOpPart* that the caller can iterate over.
     // This is essentially reimplementing a simplified vector.
-    BinaryOpPart **parts_array = calloc(n_args + 1, sizeof(void*)); // +1 for count at index 0
-    if (!parts_array) {
-        for (int i = 0; i < n_args; ++i) {
+    BinaryOpPart ** parts_array = calloc(n_args + 1, sizeof(*parts_array)); // +1 for count at index 0
+    if (!parts_array)
+    {
+        for (int i = 0; i < n_args; ++i)
+        {
             mpc_destroy_binary_op_part(args[i]);
         }
         return NULL;
@@ -525,20 +577,24 @@ static mpc_val_t *mpc_collect_binary_op_parts(int n_args, mpc_val_t **args) {
 
     // Store the count in the first element.
     parts_array[0] = (BinaryOpPart *)(long)n_args; // Cast int to void* using long to avoid warnings
-    for (int i = 0; i < n_args; ++i) {
-        parts_array[i+1] = (BinaryOpPart *)args[i]; // Store the pointers
+    for (int i = 0; i < n_args; ++i)
+    {
+        parts_array[i + 1] = (BinaryOpPart *)args[i]; // Store the pointers
     }
 
-    return (mpc_val_t *)parts_array; // Return as mpc_val_t*
+    return parts_array;
 }
 
 // Destructor for the array returned by mpc_collect_binary_op_parts
-static void mpc_destroy_collected_binary_op_parts(mpc_val_t *val) {
-    BinaryOpPart **parts_array = (BinaryOpPart **)val;
-    if (parts_array) {
+static void mpc_destroy_collected_binary_op_parts(mpc_val_t * val)
+{
+    BinaryOpPart ** parts_array = (BinaryOpPart **)val;
+    if (parts_array)
+    {
         int count = (int)(long)parts_array[0]; // Retrieve count
-        for (int i = 0; i < count; ++i) {
-            mpc_destroy_binary_op_part(parts_array[i+1]);
+        for (int i = 0; i < count; ++i)
+        {
+            mpc_destroy_binary_op_part(parts_array[i + 1]);
         }
         free(parts_array);
     }
@@ -548,30 +604,37 @@ static void mpc_destroy_collected_binary_op_parts(mpc_val_t *val) {
 // This function collects a list of FormulaAST* for each argument into a dynamically sized array.
 // The returned mpc_val_t* will be a (FormulaAST**) cast to mpc_val_t*.
 // The first element of the array stores the count of arguments.
-static mpc_val_t *mpc_collect_argument_asts(int n_args, mpc_val_t **args) {
-    FormulaAST **asts_array = calloc(n_args + 1, sizeof(FormulaAST *));
-    if (!asts_array) {
-        for (int i = 0; i < n_args; ++i) {
+static mpc_val_t * mpc_collect_argument_asts(int n_args, mpc_val_t ** args)
+{
+    FormulaAST ** asts_array = calloc(n_args + 1, sizeof(*asts_array));
+    if (!asts_array)
+    {
+        for (int i = 0; i < n_args; ++i)
+        {
             formula_ast_destroy_internal(args[i]);
         }
         return NULL;
     }
 
     asts_array[0] = (FormulaAST *)(long)n_args; // Store count in the first element
-    for (int i = 0; i < n_args; ++i) {
-        asts_array[i+1] = (FormulaAST *)args[i];
+    for (int i = 0; i < n_args; ++i)
+    {
+        asts_array[i + 1] = (FormulaAST *)args[i];
     }
 
-    return (mpc_val_t *)asts_array;
+    return asts_array;
 }
 
 // Destructor for the array returned by mpc_collect_argument_asts
-static void mpc_destroy_collected_argument_asts(mpc_val_t *val) {
-    FormulaAST **asts_array = (FormulaAST **)val;
-    if (asts_array) {
+static void mpc_destroy_collected_argument_asts(mpc_val_t * val)
+{
+    FormulaAST ** asts_array = (FormulaAST **)val;
+    if (asts_array)
+    {
         int count = (int)(long)asts_array[0]; // Retrieve count
-        for (int i = 0; i < count; ++i) {
-            formula_ast_destroy_internal(asts_array[i+1]);
+        for (int i = 0; i < count; ++i)
+        {
+            formula_ast_destroy_internal(asts_array[i + 1]);
         }
         free(asts_array);
     }
@@ -580,19 +643,22 @@ static void mpc_destroy_collected_argument_asts(mpc_val_t *val) {
 // MPC fold callback for left-associative binary operations.
 // args will be [initial_ast, collected_binary_op_parts_array]
 // where collected_binary_op_parts_array is (BinaryOpPart**) from mpc_collect_binary_op_parts
-static mpc_val_t *mpc_fold_left_associative_binary_op(int n_args, mpc_val_t **args) {
+static mpc_val_t * mpc_fold_left_associative_binary_op(int n_args, mpc_val_t ** args)
+{
     // n_args will be 2: args[0] is initial_ast, args[1] is (BinaryOpPart**) from mpc_collect_binary_op_parts
     if (n_args != 2)
     {
         return NULL;
     }
     FormulaAST * left_ast = (FormulaAST *)args[0];
-    BinaryOpPart **parts_array = (BinaryOpPart **)args[1];
+    BinaryOpPart ** parts_array = (BinaryOpPart **)args[1];
 
-    if (parts_array) {
+    if (parts_array)
+    {
         int count = (int)(long)parts_array[0]; // Retrieve count
-        for (int i = 0; i < count; ++i) {
-            BinaryOpPart *part = parts_array[i+1];
+        for (int i = 0; i < count; ++i)
+        {
+            BinaryOpPart * part = parts_array[i + 1];
             left_ast = formula_ast_create_binary_op(part->op_name, left_ast, part->operand);
             free(part->op_name); // Free the operator string
             free(part); // Free the BinaryOpPart struct
@@ -603,19 +669,22 @@ static mpc_val_t *mpc_fold_left_associative_binary_op(int n_args, mpc_val_t **ar
 }
 
 // Temporary struct to hold parsed function call info before validation
-typedef struct {
-    char* name;
-    FormulaAST** args; // Custom array from mpc_collect_argument_asts
+typedef struct
+{
+    char * name;
+    FormulaAST ** args; // Custom array from mpc_collect_argument_asts
 } RawFunctionCallInfo;
 
 // Fold function to create RawFunctionCallInfo struct
-static mpc_val_t* mpc_make_raw_function_call(int n, mpc_val_t** v)
+static mpc_val_t * mpc_make_raw_function_call(int n, mpc_val_t ** v)
 {
     (void)n;
-    RawFunctionCallInfo* info = calloc(1, sizeof(*info));
-
-    info->name = v[0]; // ident
-    info->args = v[2]; // OptArgList result
+    RawFunctionCallInfo * info = calloc(1, sizeof(*info));
+    if (info != NULL)
+    {
+        info->name = v[0]; // ident
+        info->args = v[2]; // OptArgList result
+    }
 
     free(v[1]); // '('
     free(v[3]); // ')'
@@ -625,11 +694,12 @@ static mpc_val_t* mpc_make_raw_function_call(int n, mpc_val_t** v)
 }
 
 // Destructor for RawFunctionCallInfo
-static void destroy_raw_function_call(mpc_val_t* val)
+static void destroy_raw_function_call(mpc_val_t * val)
 {
-    RawFunctionCallInfo* info = val;
+    RawFunctionCallInfo * info = val;
 
-    if (!info) return;
+    if (!info)
+        return;
 
     free(info->name);
     // The destructor for the argument itself is handled by mpc_check
@@ -638,13 +708,15 @@ static void destroy_raw_function_call(mpc_val_t* val)
 }
 
 // mpc_check function to validate the function call
-static int check_function_call(mpc_val_t** val) {
-    RawFunctionCallInfo* info = *val;
+static int check_function_call(mpc_val_t ** val)
+{
+    RawFunctionCallInfo * info = *val;
 
-    function_t const* func = function_lookup_by_name(info->name);
+    function_t const * func = function_lookup_by_name(info->name);
     size_t num_passed_args = info->args ? (size_t)(long)info->args[0] : 0;
 
-    if (!func || func->num_args != num_passed_args) {
+    if (!func || func->num_args != num_passed_args)
+    {
         return 0; // Failure
     }
 
@@ -652,26 +724,31 @@ static int check_function_call(mpc_val_t** val) {
 }
 
 // mpc_apply function to convert RawFunctionCallInfo to FormulaAST
-static mpc_val_t* make_function_ast_from_raw(mpc_val_t* val) {
-    RawFunctionCallInfo* info = val;
+static mpc_val_t * make_function_ast_from_raw(mpc_val_t * val)
+{
+    RawFunctionCallInfo * info = val;
     size_t num_args = info->args ? (size_t)(long)info->args[0] : 0;
-    FormulaAST** arg_asts = NULL;
-    if (num_args > 0) {
-        arg_asts = malloc(num_args * sizeof(FormulaAST*));
-        if (!arg_asts) {
-             destroy_raw_function_call(info);
-             return NULL;
+    FormulaAST ** arg_asts = NULL;
+    if (num_args > 0)
+    {
+        arg_asts = malloc(num_args * sizeof(FormulaAST *));
+        if (!arg_asts)
+        {
+            destroy_raw_function_call(info);
+            return NULL;
         }
-        for (size_t i = 0; i < num_args; i++) {
-            arg_asts[i] = info->args[i+1];
+        for (size_t i = 0; i < num_args; i++)
+        {
+            arg_asts[i] = info->args[i + 1];
         }
     }
 
-    FormulaAST* node = formula_ast_create_function_call(info->name, arg_asts, num_args);
+    FormulaAST * node = formula_ast_create_function_call(info->name, arg_asts, num_args);
 
     // Cleanup RawFunctionCallInfo, but not the ASTs it was pointing to
     free(info->name);
-    if (info->args) {
+    if (info->args)
+    {
         free(info->args); // Free the container, not the ASTs
     }
     free(info);
@@ -684,23 +761,23 @@ eval_error_to_string(EvalError error)
 {
     switch (error)
     {
-        case EVAL_ERROR_NONE:
-            return "No error";
-        case EVAL_ERROR_DIVISION_BY_ZERO:
-            return "Division by zero";
-        case EVAL_ERROR_UNKNOWN_CONSTANT:
-            return "Unknown constant";
-        case EVAL_ERROR_UNKNOWN_VARIABLE:
-            return "Unknown variable";
-        case EVAL_ERROR_UNKNOWN_OPERATION:
-            return "Unknown operation";
-        case EVAL_ERROR_NULL_FORMULA:
-            return "NULL formula";
-        case EVAL_ERROR_INVALID_ARGUMENTS:
-            return "Invalid arguments";
-        case EVAL_ERROR_UNKNOWN:
-        default:
-            return "Unknown error";
+    case EVAL_ERROR_NONE:
+        return "No error";
+    case EVAL_ERROR_DIVISION_BY_ZERO:
+        return "Division by zero";
+    case EVAL_ERROR_UNKNOWN_CONSTANT:
+        return "Unknown constant";
+    case EVAL_ERROR_UNKNOWN_VARIABLE:
+        return "Unknown variable";
+    case EVAL_ERROR_UNKNOWN_OPERATION:
+        return "Unknown operation";
+    case EVAL_ERROR_NULL_FORMULA:
+        return "NULL formula";
+    case EVAL_ERROR_INVALID_ARGUMENTS:
+        return "Invalid arguments";
+    case EVAL_ERROR_UNKNOWN:
+    default:
+        return "Unknown error";
     }
 }
 
@@ -732,7 +809,7 @@ formula_compile(char const * const formula)
     f->Formula   = mpc_new("formula");
 
     // Define individual parsers using mpc_* combinators and our custom callbacks
-        // Numbers
+    // Numbers
     mpc_define(f->Float, mpc_apply(mpc_and(3, mpcf_strfold, mpc_digits(), mpc_char('.'), mpc_digits(), free, free), mpc_make_float));
     mpc_define(f->Int, mpc_apply(mpc_re("[0-9]+"), mpc_make_integer));
     // 'number' just passes through float or int AST
@@ -755,15 +832,15 @@ formula_compile(char const * const formula)
     // Generic Function Call Parser
     // identifier '(' [ arg_list ] ')'
     // An arg_list is one or more expressions, separated by commas.
-    mpc_parser_t *Ident = mpc_re("[a-zA-Z_][a-zA-Z0-9_]*");
-    mpc_parser_t *open_paren = mpc_stripl(mpc_char('('));
-    mpc_parser_t *close_paren = mpc_stripl(mpc_char(')'));
-    mpc_parser_t *comma = mpc_stripl(mpc_char(','));
+    mpc_parser_t * Ident = mpc_re("[a-zA-Z_][a-zA-Z0-9_]*");
+    mpc_parser_t * open_paren = mpc_stripl(mpc_char('('));
+    mpc_parser_t * close_paren = mpc_stripl(mpc_char(')'));
+    mpc_parser_t * comma = mpc_stripl(mpc_char(','));
 
-    mpc_parser_t *ArgList = mpc_sepby1(mpc_collect_argument_asts, comma, f->Expr);
-    mpc_parser_t *OptArgList = mpc_maybe(ArgList);
+    mpc_parser_t * ArgList = mpc_sepby1(mpc_collect_argument_asts, comma, f->Expr);
+    mpc_parser_t * OptArgList = mpc_maybe(ArgList);
 
-    mpc_parser_t *RawFunctionCall =
+    mpc_parser_t * RawFunctionCall =
         mpc_and(
             4,
             mpc_make_raw_function_call,
@@ -774,27 +851,27 @@ formula_compile(char const * const formula)
             free, free, (mpc_dtor_t)mpc_destroy_collected_argument_asts
         );
 
-    mpc_parser_t *CheckedFunctionCall =
+    mpc_parser_t * CheckedFunctionCall =
         mpc_check(
             RawFunctionCall,
             (mpc_dtor_t)destroy_raw_function_call,
             check_function_call,
-            "valid function call"
+            "invalid function call"
         );
-    mpc_parser_t *FunctionCall = mpc_apply(CheckedFunctionCall, make_function_ast_from_raw);
+    mpc_parser_t * FunctionCall = mpc_apply(CheckedFunctionCall, make_function_ast_from_raw);
 
-    // Factor rules: order matters (longest match first)
+    // Factor rules: order matters.
     mpc_define(
         f->Factor,
         mpc_or(6,
-            mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
-            FunctionCall, // Generic function call
-            mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)),
-            mpc_stripl(mpc_copy(f->Number)),
-            mpc_stripl(mpc_copy(f->Constant)),
-            mpc_stripl(mpc_copy(f->Variable))
-        )
-    );
+               mpc_and(2, (mpc_fold_t)mpc_make_unary_op_fold, mpc_stripl(mpc_char('-')), mpc_copy(f->Factor), free, (mpc_dtor_t)formula_ast_destroy), // Unary minus: -Factor
+               FunctionCall, // Generic function call
+               mpc_stripl(mpc_parens(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy)),
+               mpc_stripl(mpc_copy(f->Number)),
+               mpc_stripl(mpc_copy(f->Constant)),
+               mpc_stripl(mpc_copy(f->Variable))
+              )
+        );
 
     // Term (multiplication and division)
     // term : <factor> (('*' | '/') <factor>)* ;
@@ -813,10 +890,10 @@ formula_compile(char const * const formula)
                     mpc_stripl(mpc_copy(f->Factor)),
                     free,
                     (mpc_dtor_t)formula_ast_destroy
-                )
-            ), // Collects list of (op_str, factor_ast) parts into a custom array
-        (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
-    ));
+                    )
+                ), // Collects list of (op_str, factor_ast) parts into a custom array
+            (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
+            ));
 
 
     // Expression (addition and subtraction)
@@ -837,25 +914,25 @@ formula_compile(char const * const formula)
                     free, (mpc_dtor_t)formula_ast_destroy)
                 ),
             (mpc_dtor_t)mpc_destroy_collected_binary_op_parts // Destructor for collected parts
-        )
-    );
+            )
+        );
 
     // Formula (start and end of input)
     mpc_define(
         f->Formula,
         mpc_and(3,
-           mpcf_snd_free,
-           mpc_soi(),
-           mpc_stripr(mpc_copy(f->Expr)),
-           mpc_eoi(),
-           mpcf_dtor_null,
-           (mpc_dtor_t)formula_ast_destroy
-        )
-    ); // Keep only the Expr AST
+                mpcf_snd_free,
+                mpc_soi(),
+                mpc_stripr(mpc_copy(f->Expr)),
+                mpc_eoi(),
+                mpcf_dtor_null,
+                (mpc_dtor_t)formula_ast_destroy
+               )
+        ); // Keep only the Expr AST
 
-    mpc_result_t parse_result = {0};
+    mpc_result_t parse_result = { 0 };
 
-    if (mpc_parse("<input>", formula, f->Formula, &parse_result))
+    if (mpc_parse("<formula>", formula, f->Formula, &parse_result))
     {
         // Now parse_result.output should directly be a FormulaAST*
         f->ast = (FormulaAST *)parse_result.output;
@@ -877,7 +954,7 @@ formula_compile(char const * const formula)
             f->Term,
             f->Expr,
             f->Formula
-        );
+            );
         free(f);
         return NULL;
     }
@@ -891,7 +968,7 @@ formula_evaluate(Formula * const f, double const x)
 {
     if (NULL == f)
     {
-        return (EvalResult){.error = EVAL_ERROR_NULL_FORMULA};
+        return (EvalResult) { .error = EVAL_ERROR_NULL_FORMULA };
     }
 
     return eval_ast(f->ast, x);
@@ -909,7 +986,18 @@ formula_cleanup(Formula * f)
     }
 
     formula_ast_destroy(f->ast);
-    mpc_cleanup(9, f->Float, f->Int, f->Number, f->Variable, f->Constant, f->Factor, f->Term, f->Expr, f->Formula);
+    mpc_cleanup(
+        9,
+        f->Float,
+        f->Int,
+        f->Number,
+        f->Variable,
+        f->Constant,
+        f->Factor,
+        f->Term,
+        f->Expr,
+        f->Formula
+    );
     free(f);
 }
 
@@ -957,103 +1045,119 @@ eval_ast(FormulaAST const * const tree, double const x_value)
 {
     if (NULL == tree)
     {
-        return (EvalResult){.error = EVAL_ERROR_UNKNOWN}; // Or specific error for null AST
+        return (EvalResult) { .error = EVAL_ERROR_UNKNOWN }; // Or specific error for null AST
     }
 
-    switch (tree->type) {
-        case FORMULA_AST_NODE_TYPE_NUMBER:
-            return (EvalResult){.value = tree->data.number_value, .error = EVAL_ERROR_NONE};
-        case FORMULA_AST_NODE_TYPE_CONSTANT:
+    switch (tree->type)
+    {
+    case FORMULA_AST_NODE_TYPE_NUMBER:
+        return (EvalResult) { .value = tree->data.number_value, .error = EVAL_ERROR_NONE };
+    case FORMULA_AST_NODE_TYPE_CONSTANT:
+    {
+        constant_t const * const constant = constant_lookup_by_name(tree->data.variable_name);
+
+        if (constant == NULL)
         {
-            constant_t const * const constant = constant_lookup_by_name(tree->data.variable_name);
-
-            if (constant == NULL)
-            {
-                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_CONSTANT}; // For unknown constants
-            }
-            return (EvalResult){.value = constant->value, .error = EVAL_ERROR_NONE};
+            return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_CONSTANT }; // For unknown constants
         }
-        case FORMULA_AST_NODE_TYPE_VARIABLE:
-            if (strcmp(tree->data.variable_name, "x") == 0) {
-                return (EvalResult){.value = x_value, .error = EVAL_ERROR_NONE};
-            }
-            return (EvalResult){.error = EVAL_ERROR_UNKNOWN_VARIABLE}; // For unknown variables
-        case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
+        return (EvalResult) { .value = constant->value, .error = EVAL_ERROR_NONE };
+    }
+    case FORMULA_AST_NODE_TYPE_VARIABLE:
+        if (strcmp(tree->data.variable_name, "x") == 0)
+        {
+            return (EvalResult) { .value = x_value, .error = EVAL_ERROR_NONE };
+        }
+        return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_VARIABLE }; // For unknown variables
+    case FORMULA_AST_NODE_TYPE_BINARY_OPERATOR:
+    {
+        EvalResult left_res = eval_ast(tree->data.binary_op.left, x_value);
+        if (left_res.error != EVAL_ERROR_NONE)
+            return left_res;
+        EvalResult right_res = eval_ast(tree->data.binary_op.right, x_value);
+        if (right_res.error != EVAL_ERROR_NONE)
+            return right_res;
+
+        double left_val = left_res.value;
+        double right_val = right_res.value;
+        char const * op = tree->data.binary_op.operator_name;
+
+        if (strcmp(op, "+") == 0)
+            return (EvalResult) { .value = left_val + right_val, .error = EVAL_ERROR_NONE };
+        else if (strcmp(op, "-") == 0)
+            return (EvalResult) { .value = left_val - right_val, .error = EVAL_ERROR_NONE };
+        else if (strcmp(op, "*") == 0)
+            return (EvalResult) { .value = left_val * right_val, .error = EVAL_ERROR_NONE };
+        else if (strcmp(op, "/") == 0)
+        {
+            if (right_val == 0.0)
+                return (EvalResult) { .error = EVAL_ERROR_DIVISION_BY_ZERO };
+            return (EvalResult) { .value = left_val / right_val, .error = EVAL_ERROR_NONE };
+        }
+        return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_OPERATION };
+    }
+    case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
+    {
+        EvalResult child_res = eval_ast(tree->data.unary_op.child, x_value);
+        if (child_res.error != EVAL_ERROR_NONE)
+            return child_res;
+        double child_val = child_res.value;
+        char const * op = tree->data.unary_op.operator_name;
+
+        if (strcmp(op, "-") == 0)
+            return (EvalResult) { .value = -child_val, .error = EVAL_ERROR_NONE };
+        return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_OPERATION };
+    }
+    case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
+    {
+        char const * func_name = tree->data.function_call.function_name;
+        size_t num_args = tree->data.function_call.num_args;
+        FormulaAST * const * args = tree->data.function_call.args;
+
+        function_t const * func = function_lookup_by_name(func_name);
+        if (func == NULL)
+        {
+            return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_OPERATION };
+        }
+        if (func->num_args != num_args)
+        {
+            return (EvalResult) { .error = EVAL_ERROR_INVALID_ARGUMENTS };
+        }
+        // Evaluate arguments
+        EvalResult * arg_results = calloc(num_args, sizeof(EvalResult));
+        if (!arg_results)
+            return (EvalResult) { .error = EVAL_ERROR_UNKNOWN };
+
+        for (size_t i = 0; i < num_args; ++i)
+        {
+            arg_results[i] = eval_ast(args[i], x_value);
+            if (arg_results[i].error != EVAL_ERROR_NONE)
             {
-                EvalResult left_res = eval_ast(tree->data.binary_op.left, x_value);
-                if (left_res.error != EVAL_ERROR_NONE) return left_res;
-                EvalResult right_res = eval_ast(tree->data.binary_op.right, x_value);
-                if (right_res.error != EVAL_ERROR_NONE) return right_res;
-
-                double left_val = left_res.value;
-                double right_val = right_res.value;
-                char const *op = tree->data.binary_op.operator_name;
-
-                if (strcmp(op, "+") == 0) return (EvalResult){.value = left_val + right_val, .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "-") == 0) return (EvalResult){.value = left_val - right_val, .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "*") == 0) return (EvalResult){.value = left_val * right_val, .error = EVAL_ERROR_NONE};
-                else if (strcmp(op, "/") == 0) {
-                    if (right_val == 0.0) return (EvalResult){.error = EVAL_ERROR_DIVISION_BY_ZERO};
-                    return (EvalResult){.value = left_val / right_val, .error = EVAL_ERROR_NONE};
-                }
-                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
-            }
-        case FORMULA_AST_NODE_TYPE_UNARY_OPERATOR:
-            {
-                EvalResult child_res = eval_ast(tree->data.unary_op.child, x_value);
-                if (child_res.error != EVAL_ERROR_NONE) return child_res;
-                double child_val = child_res.value;
-                char const *op = tree->data.unary_op.operator_name;
-
-                if (strcmp(op, "-") == 0) return (EvalResult){.value = -child_val, .error = EVAL_ERROR_NONE};
-                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
-            }
-        case FORMULA_AST_NODE_TYPE_FUNCTION_CALL:
-            {
-                char const *func_name = tree->data.function_call.function_name;
-                size_t num_args = tree->data.function_call.num_args;
-                FormulaAST * const *args = tree->data.function_call.args;
-
-                function_t const * func = function_lookup_by_name(func_name);
-                if (func == NULL)
-                {
-                    return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
-                }
-                if (func->num_args != num_args)
-                {
-                    return (EvalResult) { .error = EVAL_ERROR_INVALID_ARGUMENTS };
-                }
-                // Evaluate arguments
-                EvalResult *arg_results = calloc(num_args, sizeof(EvalResult));
-                if (!arg_results) return (EvalResult){.error = EVAL_ERROR_UNKNOWN};
-
-                for (size_t i = 0; i < num_args; ++i) {
-                    arg_results[i] = eval_ast(args[i], x_value);
-                    if (arg_results[i].error != EVAL_ERROR_NONE) {
-                        EvalResult res = arg_results[i];
-                        free(arg_results);
-                        return res;
-                    }
-                }
-
-                // Single argument functions
-                if (num_args == 1) {
-                    double arg_val = arg_results[0].value;
-                    double const res = func->fn(arg_val);
-                    free(arg_results);
-                    return (EvalResult){.value = res, .error = EVAL_ERROR_NONE};
-                }
-                if (num_args == 2) {
-                    double const arg1_val = arg_results[0].value;
-                    double const arg2_val = arg_results[1].value;
-                    double const res = func->fn(arg1_val, arg2_val);
-                    free(arg_results);
-                    return (EvalResult){.value = res, .error = EVAL_ERROR_NONE};
-                }
+                EvalResult res = arg_results[i];
                 free(arg_results);
-                return (EvalResult){.error = EVAL_ERROR_UNKNOWN_OPERATION};
+                return res;
             }
+        }
+
+        // Single argument functions
+        if (num_args == 1)
+        {
+            double arg_val = arg_results[0].value;
+            double const res = func->fn(arg_val);
+            free(arg_results);
+            return (EvalResult) { .value = res, .error = EVAL_ERROR_NONE };
+        }
+        if (num_args == 2)
+        {
+            double const arg1_val = arg_results[0].value;
+            double const arg2_val = arg_results[1].value;
+            double const res = func->fn(arg1_val, arg2_val);
+            free(arg_results);
+            return (EvalResult) { .value = res, .error = EVAL_ERROR_NONE };
+        }
+        free(arg_results);
+        return (EvalResult) { .error = EVAL_ERROR_UNKNOWN_OPERATION };
+    }
         // No default or FORMULA_AST_NODE_TYPE_NEGATIVE_NUMBER as it's handled as UNARY_OPERATOR
     }
-    return (EvalResult){.error = EVAL_ERROR_UNKNOWN};
+    return (EvalResult) { .error = EVAL_ERROR_UNKNOWN };
 }
