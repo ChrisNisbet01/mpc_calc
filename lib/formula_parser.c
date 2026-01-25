@@ -653,6 +653,20 @@ eval_error_to_string(EvalError error)
     }
 }
 
+static bool
+constant_parse_cb(constant_t const * const constant, void *user_ctx)
+{
+    mpc_parser_t * * Constant_or = user_ctx;
+    if (*Constant_or == NULL)
+    {
+        *Constant_or = mpc_stripl(mpc_string(constant->name));
+    } else {
+        *Constant_or = mpc_or(2, *Constant_or, mpc_stripl(mpc_string(constant->name)));
+    }
+
+    return false;
+}
+
 /*
  * See header file for documentation.
  */
@@ -700,17 +714,14 @@ formula_compile(char const * const formula)
     );
 
     // Constant
-    mpc_define(
-        f->Constant,
-        mpc_apply(
-            mpc_or(
-                2,
-                mpc_stripl(mpc_string("pi")),
-                mpc_stripl(mpc_string("e"))
-            ),
-            mpc_make_constant
-        )
-    );
+    mpc_parser_t *Constant_or = NULL;
+    constants_foreach(constant_parse_cb, &Constant_or);
+
+    if (Constant_or != NULL)
+    {
+        mpc_define(f->Constant, mpc_apply(Constant_or, mpc_make_constant));
+    }
+
 
     // Factor rules: order matters (longest match first)
     mpc_define(
