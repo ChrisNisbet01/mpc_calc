@@ -75,7 +75,47 @@ struct FormulaContext
 
     /* Custom AST */
     FormulaAST * ast;
+
+    /* Error message for parsing failures */
+    char *parsing_error_message;
 };
+
+// Public API for retrieving the last parsing error
+char const *
+formula_get_last_error(Formula * const f)
+{
+    if (f && f->parsing_error_message) {
+        return f->parsing_error_message;
+    }
+    return NULL;
+}
+
+char const *
+eval_error_to_string(EvalError error)
+{
+    switch (error)
+    {
+    case EVAL_ERROR_NONE:
+        return "No error";
+    case EVAL_ERROR_DIVISION_BY_ZERO:
+        return "Division by zero";
+    case EVAL_ERROR_UNKNOWN_CONSTANT:
+        return "Unknown constant";
+    case EVAL_ERROR_UNKNOWN_VARIABLE:
+        return "Unknown variable";
+    case EVAL_ERROR_UNKNOWN_OPERATION:
+        return "Unknown operation";
+    case EVAL_ERROR_NULL_FORMULA:
+        return "NULL formula";
+    case EVAL_ERROR_INVALID_ARGUMENTS:
+        return "Invalid arguments";
+    case EVAL_ERROR_PARSING_FAILED:
+        return "Parsing failed";
+    case EVAL_ERROR_UNKNOWN:
+    default:
+        return "Unknown error";
+    }
+}
 
 typedef struct constant_t
 {
@@ -756,35 +796,9 @@ static mpc_val_t * make_function_ast_from_raw(mpc_val_t * val)
     return node;
 }
 
-char const *
-eval_error_to_string(EvalError error)
-{
-    switch (error)
-    {
-    case EVAL_ERROR_NONE:
-        return "No error";
-    case EVAL_ERROR_DIVISION_BY_ZERO:
-        return "Division by zero";
-    case EVAL_ERROR_UNKNOWN_CONSTANT:
-        return "Unknown constant";
-    case EVAL_ERROR_UNKNOWN_VARIABLE:
-        return "Unknown variable";
-    case EVAL_ERROR_UNKNOWN_OPERATION:
-        return "Unknown operation";
-    case EVAL_ERROR_NULL_FORMULA:
-        return "NULL formula";
-    case EVAL_ERROR_INVALID_ARGUMENTS:
-        return "Invalid arguments";
-    case EVAL_ERROR_UNKNOWN:
-    default:
-        return "Unknown error";
-    }
-}
-
 /*
  * See header file for documentation.
  */
-
 Formula *
 formula_compile(char const * const formula)
 {
@@ -936,28 +950,16 @@ formula_compile(char const * const formula)
     {
         // Now parse_result.output should directly be a FormulaAST*
         f->ast = (FormulaAST *)parse_result.output;
-        return f;
     }
     else
     {
-        mpc_err_print(parse_result.error);
+        f->parsing_error_message = mpc_err_string(parse_result.error);
+        f->ast = NULL; // Ensure AST is NULL if parsing fails
         mpc_err_delete(parse_result.error);
-        /* Cleanup the parsers before freeing the context */
-        mpc_cleanup(
-            9,
-            f->Float,
-            f->Int,
-            f->Number,
-            f->Variable,
-            f->Constant,
-            f->Factor,
-            f->Term,
-            f->Expr,
-            f->Formula
-            );
-        free(f);
-        return NULL;
+        // Note: f itself is returned, even if it contains a parsing error.
+        // The caller must check formula_get_last_error() or formula->ast to determine success.
     }
+    return f;
 }
 
 /*
@@ -968,7 +970,12 @@ formula_evaluate(Formula * const f, double const x)
 {
     if (NULL == f)
     {
-        return (EvalResult) { .error = EVAL_ERROR_NULL_FORMULA };
+        return (EvalResult){ .error = EVAL_ERROR_NULL_FORMULA };
+    }
+
+    // If formula_compile failed, return the parsing error directly
+    if (f->parsing_error_message != NULL) {
+        return (EvalResult){ .error = EVAL_ERROR_PARSING_FAILED, .detailed_error_message = f->parsing_error_message };
     }
 
     return eval_ast(f->ast, x);
@@ -986,6 +993,7 @@ formula_cleanup(Formula * f)
     }
 
     formula_ast_destroy(f->ast);
+    free(f->parsing_error_message);
     mpc_cleanup(
         9,
         f->Float,
@@ -1009,8 +1017,18 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
 {
     Formula * const f = formula_compile(formula);
 
-    if (NULL == f)
+    // If formula_compile returns NULL, it's a memory allocation failure or similar
+    if (f == NULL)
     {
+        return -1;
+    }
+
+    // Check if formula_compile encountered a parsing error
+    char const * const error_message = formula_get_last_error(f);
+
+    if (error_message != NULL) {
+        fprintf(stderr, "parsing error: %s\n", error_message);
+        formula_cleanup(f); // Clean up the partially compiled formula
         return -1;
     }
 
@@ -1018,6 +1036,7 @@ parse_and_evaluate(char const * const formula, double const x, double * const re
     if (eval_result.error != EVAL_ERROR_NONE)
     {
         *result = 0.0;
+        formula_cleanup(f); // Clean up the compiled formula
         return -1;
     }
     else

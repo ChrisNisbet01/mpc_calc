@@ -14,7 +14,12 @@ target_include_directories(mpc_calc_tests PRIVATE
 )
 
 # Link to the targets created by CppUTest's CMakeLists.txt and our parser lib
-target_link_libraries(mpc_calc_tests PRIVATE formula_parser_static CppUTest CppUTestExt mpc_lib)
+target_link_libraries(mpc_calc_tests PRIVATE
+    formula_parser_static
+    CppUTest
+    CppUTestExt
+    mpc_lib
+)
 
 add_test(
     NAME RunMpcCalcTests

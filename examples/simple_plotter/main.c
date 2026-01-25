@@ -57,7 +57,6 @@ static bool drawGraphPressed = false;
 
 // --- Graphing Data and Status ---
 static char compileStatusBuffer[MAX_FORMULA_CHARS + 64] = "Enter formula and parameters";
-static Formula * compiledFormula = NULL; // Compiled formula context
 static Vector2 * graphPoints = NULL;    // Dynamic array of points to draw
 static int graphPointsCount = 0;
 static float effectiveXRange = 0.0f; // Calculated X-axis range for display
@@ -74,11 +73,8 @@ static void
 recalculate_graph(void)
 {
     // Cleanup previous formula and points
-    if (NULL != compiledFormula)
-    {
-        formula_cleanup(compiledFormula);
-        compiledFormula = NULL;
-    }
+    Formula * compiledFormula = formula_compile(formulaInputText);
+
     if (NULL != graphPoints)
     {
         MemFree(graphPoints);
@@ -87,11 +83,16 @@ recalculate_graph(void)
     }
 
     // Parse and compile new formula
-    compiledFormula = formula_compile(formulaInputText);
     if (NULL == compiledFormula)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error compiling formula '%s'", formulaInputText);
         return;
+    }
+    char const * const error_message = formula_get_last_error(compiledFormula);
+    if (error_message != NULL)
+    {
+        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: '%s'", error_message);
+        goto done;
     }
     snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
 
@@ -101,9 +102,7 @@ recalculate_graph(void)
     if (effectiveXRange <= 0.0f || effectiveYRange <= 0.0f || stepVal <= 0.0f)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Invalid range or step value.");
-        formula_cleanup(compiledFormula);
-        compiledFormula = NULL;
-        return;
+        goto done;
     }
 
     // Generate graph points
@@ -114,9 +113,7 @@ recalculate_graph(void)
     if (NULL == graphPoints)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory for graph points.");
-        formula_cleanup(compiledFormula);
-        compiledFormula = NULL;
-        return;
+        goto done;
     }
 
     for (int i = 0; i < estimatedPoints; ++i)
@@ -169,12 +166,10 @@ recalculate_graph(void)
             if (NULL == newGraphPoints)
             {
                 snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory during reallocation.");
-                formula_cleanup(compiledFormula);
-                compiledFormula = NULL;
                 MemFree(graphPoints);
                 graphPoints = NULL;
                 graphPointsCount = 0;
-                return;
+                goto done;
             }
             graphPoints = newGraphPoints;
         }
@@ -188,6 +183,9 @@ recalculate_graph(void)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "No valid points to plot for '%s'", formulaInputText);
     }
+
+done:
+    formula_cleanup(compiledFormula);
 }
 
 
@@ -480,11 +478,6 @@ main(int argc, char ** argv)
     }
 
     // Clean up
-    if (NULL != compiledFormula)
-    {
-        formula_cleanup(compiledFormula);
-        compiledFormula = NULL;
-    }
     if (NULL != graphPoints)
     {
         MemFree(graphPoints);
