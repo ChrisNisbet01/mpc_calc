@@ -231,11 +231,17 @@ func_sqrt(double const val)
     return sqrt(val);
 }
 
+typedef double (*unary_func_t)(double v1);
+typedef double (*binary_func_t)(double v1, double v2);
+
 typedef struct function_t
 {
     char const * name;
     size_t num_args;
-    double (*fn)(); /* Don't specify parameters as the functions take different numbers of them.*/
+    union {
+        unary_func_t unary;
+        binary_func_t binary;
+    };
 } function_t;
 
 typedef bool (*functions_foreach_cb)(function_t const * func, void * ctx);
@@ -245,52 +251,52 @@ static function_t functions[] =
     {
         .name = "cos",
         .num_args = 1,
-        func_cos,
+        .unary = func_cos,
     },
     {
         .name = "sin",
         .num_args = 1,
-        func_sin,
+        .unary = func_sin,
     },
     {
         .name = "tan",
         .num_args = 1,
-        func_tan,
+        .unary = func_tan,
     },
     {
         .name = "acos",
         .num_args = 1,
-        func_acos,
+        .unary = func_acos,
     },
     {
         .name = "asin",
         .num_args = 1,
-        func_asin,
+        .unary = func_asin,
     },
     {
         .name = "atan",
         .num_args = 1,
-        func_atan,
+        .unary = func_atan,
     },
     {
         .name = "log10",
         .num_args = 1,
-        func_log10,
+        .unary = func_log10,
     },
     {
         .name = "log",
         .num_args = 1,
-        func_log,
+        .unary = func_log,
     },
     {
         .name = "sqrt",
         .num_args = 1,
-        func_sqrt,
+        .unary = func_sqrt,
     },
     {
         .name = "pow",
         .num_args = 2,
-        func_pow,
+        .binary = func_pow,
     },
 };
 
@@ -1161,7 +1167,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
         if (num_args == 1)
         {
             double arg_val = arg_results[0].value;
-            double const res = func->fn(arg_val);
+            double const res = func->unary(arg_val);
             free(arg_results);
             return (EvalResult) { .value = res, .error = EVAL_ERROR_NONE };
         }
@@ -1169,7 +1175,7 @@ eval_ast(FormulaAST const * const tree, double const x_value)
         {
             double const arg1_val = arg_results[0].value;
             double const arg2_val = arg_results[1].value;
-            double const res = func->fn(arg1_val, arg2_val);
+            double const res = func->binary(arg1_val, arg2_val);
             free(arg_results);
             return (EvalResult) { .value = res, .error = EVAL_ERROR_NONE };
         }
