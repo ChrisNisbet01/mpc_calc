@@ -28,7 +28,7 @@ This would allow users of the library (or future extensions) to add custom funct
 *   **Suggestion:** Extend the grammar and add handlers for:
     *   **Constants:** `infinity`, `nan`
     *   **Operators:** Modulo (`%`), integer division (`//`), bitwise operations (`&`, `|`, `^`, `~`, `<<`, `>>`)
-    *   **Functions:** `abs()`, `round()`, `ceil()`, `floor()`, `exp()`, `min()`, `max()`, `sign()`, `fact()` (factorial).
+    *   **Functions:** `abs()`, `round()`, `ceil()`, `floor()`, `exp()`, `min()`, `max()`, `sign()`, `fact()` (factorial). (Done)
     *   **Ternary operator:** `condition ? true_expr : false_expr`
 
 ### 2. Variable Assignment and Scope

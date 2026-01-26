@@ -171,66 +171,6 @@ constant_lookup_by_name(char const * const name)
     return constant;
 }
 
-static double
-func_cos(double const val)
-{
-    return cos(val);
-}
-
-static double
-func_sin(double const val)
-{
-    return sin(val);
-}
-
-static double
-func_tan(double const val)
-{
-    return tan(val);
-}
-
-static double
-func_acos(double const val)
-{
-    return acos(val);
-}
-
-static double
-func_asin(double const val)
-{
-    return asin(val);
-}
-
-static double
-func_atan(double const val)
-{
-    return atan(val);
-}
-
-static double
-func_log10(double const val)
-{
-    return log10(val);
-}
-
-static double
-func_log(double const val)
-{
-    return log(val);
-}
-
-static double
-func_pow(double const val, double exp)
-{
-    return pow(val, exp);
-}
-
-static double
-func_sqrt(double const val)
-{
-    return sqrt(val);
-}
-
 typedef double (*unary_func_t)(double v1);
 typedef double (*binary_func_t)(double v1, double v2);
 
@@ -251,52 +191,87 @@ static function_t functions[] =
     {
         .name = "cos",
         .num_args = 1,
-        .unary = func_cos,
+        .unary = cos,
     },
     {
         .name = "sin",
         .num_args = 1,
-        .unary = func_sin,
+        .unary = sin,
     },
     {
         .name = "tan",
         .num_args = 1,
-        .unary = func_tan,
+        .unary = tan,
     },
     {
         .name = "acos",
         .num_args = 1,
-        .unary = func_acos,
+        .unary = acos,
     },
     {
         .name = "asin",
         .num_args = 1,
-        .unary = func_asin,
+        .unary = asin,
     },
     {
         .name = "atan",
         .num_args = 1,
-        .unary = func_atan,
+        .unary = atan,
     },
     {
         .name = "log10",
         .num_args = 1,
-        .unary = func_log10,
+        .unary = log10,
     },
     {
         .name = "log",
         .num_args = 1,
-        .unary = func_log,
+        .unary = log,
     },
     {
         .name = "sqrt",
         .num_args = 1,
-        .unary = func_sqrt,
+        .unary = sqrt,
     },
     {
         .name = "pow",
         .num_args = 2,
-        .binary = func_pow,
+        .binary = pow,
+    },
+    {
+        .name = "abs",
+        .num_args = 1,
+        .unary = fabs,
+    },
+    {
+        .name = "round",
+        .num_args = 1,
+        .unary = round,
+    },
+    {
+        .name = "ceil",
+        .num_args = 1,
+        .unary = ceil,
+    },
+    {
+        .name = "floor",
+        .num_args = 1,
+        .unary = floor,
+    },
+    {
+        .name = "exp",
+        .num_args = 1,
+        .unary = exp,
+    },
+    {
+        .name = "min",
+        .num_args = 2,
+        .binary = fmin,
+    },
+    {
+        .name = "max",
+        .num_args = 2,
+        .binary = fmax,
     },
 };
 
