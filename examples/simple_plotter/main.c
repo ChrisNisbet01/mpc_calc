@@ -1,3 +1,5 @@
+#include "font_data.h"
+
 #include <formula_parser.h>
 
 #include <stdio.h>
@@ -248,7 +250,7 @@ main(int argc, char ** argv)
     SetTargetFPS(60);
     GuiSetStyle(DEFAULT, TEXT_SIZE, FONT_SIZE); // Use FONT_SIZE here
 
-    Font font = LoadFont("fonts/iosevka-regular.ttf");
+    Font font = LoadFontFromMemory(".ttf", iosevka_regular_ttf, iosevka_regular_ttf_len, FONT_SIZE, 0, 0);
     GuiSetFont(font);
 
     // Initial parsing of default formula

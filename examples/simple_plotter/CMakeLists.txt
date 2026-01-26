@@ -21,9 +21,27 @@ if(NOT raygui_POPULATED)
     FetchContent_Populate(raygui)
 endif()
 
+set(FONT_HEADER_PATH "${CMAKE_CURRENT_BINARY_DIR}/font_data.h")
+
+add_custom_command(
+    OUTPUT ${FONT_HEADER_PATH}
+    COMMAND ./create_font_header iosevka-regular.ttf ${FONT_HEADER_PATH}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/fonts
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/fonts/iosevka-regular.ttf
+    COMMENT "Generating font_data.h from iosevka-regular.ttf"
+)
+
+add_custom_target(
+    generate_font_header ALL
+    DEPENDS ${FONT_HEADER_PATH}
+)
+
 add_executable(simple_plotter
     main.c
 )
+# Ensure the generated header is created before simple_plotter is built
+add_dependencies(simple_plotter generate_font_header)
+
 
 target_link_libraries(simple_plotter PRIVATE
     formula_parser_static
@@ -33,4 +51,5 @@ target_link_libraries(simple_plotter PRIVATE
 
 target_include_directories(simple_plotter PRIVATE
     ${raygui_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_BINARY_DIR}
 )
