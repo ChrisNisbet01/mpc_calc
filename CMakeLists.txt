@@ -1,6 +1,24 @@
 cmake_minimum_required(VERSION 3.16)
 project(mpc_calc C)
 
+include(FetchContent)
+
+FetchContent_Declare(
+    mpc
+    GIT_REPOSITORY https://github.com/orangeduck/mpc.git
+    GIT_TAG master
+)
+FetchContent_GetProperties(mpc)
+if(NOT mpc_POPULATED)
+    FetchContent_Populate(mpc)
+endif()
+
+# Create mpc_lib as a proper CMake target
+add_library(mpc_lib STATIC ${mpc_SOURCE_DIR}/mpc.c)
+target_include_directories(mpc_lib PUBLIC ${mpc_SOURCE_DIR}) # Make mpc.h available
+target_compile_options(mpc_lib PRIVATE -fPIC)
+
+
 include(CTest)
 
 set(CMAKE_C_STANDARD 11)

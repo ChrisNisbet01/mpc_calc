@@ -2,3 +2,5 @@ cmake_minimum_required(VERSION 3.16)
 project(examples C)
 
 add_subdirectory(simple_plotter)
+add_subdirectory(mpc_copy)
+
