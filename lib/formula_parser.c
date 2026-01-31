@@ -913,17 +913,7 @@ formula_compile(char const * const formula)
         );
 
     // Formula (start and end of input)
-    mpc_define(
-        f->Formula,
-        mpc_and(3,
-                mpcf_snd_free,
-                mpc_soi(),
-                mpc_stripr(mpc_copy(f->Expr)),
-                mpc_eoi(),
-                mpcf_dtor_null,
-                (mpc_dtor_t)formula_ast_destroy
-               )
-        ); // Keep only the Expr AST
+    mpc_define(f->Formula, mpc_total(mpc_copy(f->Expr), (mpc_dtor_t)formula_ast_destroy));
 
     mpc_result_t parse_result = { 0 };
 
