@@ -3,4 +3,5 @@ project(examples C)
 
 add_subdirectory(simple_plotter)
 add_subdirectory(mpc_copy)
+add_subdirectory(simple_plotter_epc)
 
