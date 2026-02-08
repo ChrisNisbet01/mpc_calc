@@ -20,7 +20,7 @@
 
 // --- Error Handling ---
 
-static void set_error(ast_builder_data_t * data, pt_node_t * pt_node, const char * format, ...)
+static void set_error(ast_builder_data_t * data, epc_cpt_node_t * pt_node, const char * format, ...)
 {
     if (data->has_error)
         return; // Don't overwrite the first error
@@ -231,7 +231,7 @@ ast_builder_cleanup(ast_builder_data_t * data)
     data->ast_root = NULL;
 }
 
-void ast_builder_enter_node(pt_node_t * pt_node, void * user_data)
+void ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
 {
     ast_builder_data_t * data = (ast_builder_data_t *)user_data;
     if (data->has_error || pt_node == NULL)
@@ -239,7 +239,7 @@ void ast_builder_enter_node(pt_node_t * pt_node, void * user_data)
         return;
     }
 
-    ast_semantic_action_config_t config = easy_mpc_node_config_get(pt_node);
+    epc_ast_semantic_action_t config = epc_node_config_get(pt_node);
 
     AST_DEBUG_PRINT("[AST_BUILDER] ENTER Node: tag='%s', name='%s', content='%.*s', len=%zu, action=%d\n",
                     pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, config.action);
@@ -325,14 +325,14 @@ build_binary_tree(ast_builder_data_t * data, ast_node_t * first_operand, ast_lis
 }
 
 
-void ast_builder_exit_node(pt_node_t * pt_node, void * user_data)
+void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
 {
     ast_builder_data_t * data = (ast_builder_data_t *)user_data;
     if (data->has_error || pt_node == NULL)
     {
         return;
     }
-    ast_semantic_action_config_t config = easy_mpc_node_config_get(pt_node);
+    epc_ast_semantic_action_t config = epc_node_config_get(pt_node);
 
     AST_DEBUG_PRINT("[AST_BUILDER] EXIT Node: tag='%s', name='%s', content='%.*s', len=%zu, action=%d\n",
                     pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, config.action);

@@ -71,8 +71,8 @@ static float effectiveYRange = 0.0f; // Calculated Y-axis range for display
 
 typedef struct make_functions_cb_ctx
 {
-    parser_t * p_unary_functions;
-    parser_t * p_binary_functions;
+    epc_parser_t * p_unary_functions;
+    epc_parser_t * p_binary_functions;
 } make_functions_cb_ctx;
 
 // Function prototypes
@@ -114,10 +114,10 @@ make_functions_cb(function_t const * const func, void * const ctx)
     return false;
 }
 
-static parser_t *
+static epc_parser_t *
 make_functions_parser(void)
 {
-    parser_t * p_functions = NULL;
+    epc_parser_t * p_functions = NULL;
     make_functions_cb_ctx cb_ctx = {0};
     functions_foreach(make_functions_cb, &cb_ctx);
 
@@ -139,95 +139,95 @@ make_functions_parser(void)
 
     if (p_functions != NULL)
     {
-        p_name_set(p_functions, "functions");
+        epc_parser_set_name(p_functions, "functions");
     }
 
     return p_functions;
 }
 
-static parser_t *
+static epc_parser_t *
 create_formula_grammar(void)
 {
-    parser_t * p_double_parser = p_double();
-    p_name_set(p_double_parser, "number");
-    p_set_ast_action(p_double_parser, AST_ACTION_CREATE_NUMBER_FROM_CONTENT);
+    epc_parser_t * p_double_parser = p_double();
+    epc_parser_set_name(p_double_parser, "number");
+    epc_parser_set_ast_action(p_double_parser, AST_ACTION_CREATE_NUMBER_FROM_CONTENT);
 
-    parser_t * p_const_pi = p_string("pi");
-    p_name_set(p_const_pi, "pi");
-    parser_t * p_const_e = p_string("e");
-    p_name_set(p_const_e, "e");
-    parser_t * p_constants = p_or(2, p_const_pi, p_const_e);
-    p_name_set(p_constants, "constants");
-    p_set_ast_action(p_constants, AST_ACTION_CREATE_IDENTIFIER);
-    parser_t * oparen = p_char('(');
-    parser_t * cparen = p_char(')');
+    epc_parser_t * p_const_pi = p_string("pi");
+    epc_parser_set_name(p_const_pi, "pi");
+    epc_parser_t * p_const_e = p_string("e");
+    epc_parser_set_name(p_const_e, "e");
+    epc_parser_t * p_constants = p_or(2, p_const_pi, p_const_e);
+    epc_parser_set_name(p_constants, "constants");
+    epc_parser_set_ast_action(p_constants, AST_ACTION_CREATE_IDENTIFIER);
+    epc_parser_t * oparen = p_char('(');
+    epc_parser_t * cparen = p_char(')');
 
-    parser_t * p_var_x = p_string("x");
-    p_name_set(p_var_x, "var_x");
+    epc_parser_t * p_var_x = p_string("x");
+    epc_parser_set_name(p_var_x, "var_x");
 
-    parser_t * p_variables = p_or(1, p_var_x);
-    p_name_set(p_variables, "variable");
-    p_set_ast_action(p_variables, AST_ACTION_CREATE_IDENTIFIER);
+    epc_parser_t * p_variables = p_or(1, p_var_x);
+    epc_parser_set_name(p_variables, "variable");
+    epc_parser_set_ast_action(p_variables, AST_ACTION_CREATE_IDENTIFIER);
 
     // Additive operators
-    parser_t * p_plus_char = p_char('+');
-    parser_t * p_minus_char = p_char('-');
-    parser_t * p_add_sub_op = p_or(2, p_plus_char, p_minus_char);
-    p_name_set(p_add_sub_op, "add_sub_op");
-    p_set_ast_action(p_add_sub_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
+    epc_parser_t * p_plus_char = p_char('+');
+    epc_parser_t * p_minus_char = p_char('-');
+    epc_parser_t * p_add_sub_op = p_or(2, p_plus_char, p_minus_char);
+    epc_parser_set_name(p_add_sub_op, "add_sub_op");
+    epc_parser_set_ast_action(p_add_sub_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
 
     // Multiplicative operators
-    parser_t * p_multiply_char = p_char('*');
-    parser_t * p_divide_char = p_char('/');
-    parser_t * p_mul_div_op = p_or(2, p_multiply_char, p_divide_char);
-    p_name_set(p_mul_div_op, "mul_div_op");
-    p_set_ast_action(p_mul_div_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
+    epc_parser_t * p_multiply_char = p_char('*');
+    epc_parser_t * p_divide_char = p_char('/');
+    epc_parser_t * p_mul_div_op = p_or(2, p_multiply_char, p_divide_char);
+    epc_parser_set_name(p_mul_div_op, "mul_div_op");
+    epc_parser_set_ast_action(p_mul_div_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
 
-    parser_t * spaces = p_many(p_space());
+    epc_parser_t * spaces = p_many(p_space());
 
-    parser_t * p_functions = make_functions_parser();
-    p_set_ast_action(p_functions, AST_ACTION_CREATE_IDENTIFIER);
+    epc_parser_t * p_functions = make_functions_parser();
+    epc_parser_set_ast_action(p_functions, AST_ACTION_CREATE_IDENTIFIER);
 
     // Forward declaration for recursive grammar
-    parser_t * p_expression_fwd = epc_allocate_parser("expression_fwd");
+    epc_parser_t * p_expression_fwd = epc_parser_allocate("expression_fwd");
 
     // Argument list parser using new combinators
     // Parser for a single expression argument (potentially surrounded by spaces)
-    parser_t * p_single_expression_arg = p_and(3, spaces, p_expression_fwd, spaces);
-    p_name_set(p_single_expression_arg, "single_expression_arg");
-    p_set_ast_action(p_single_expression_arg, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_t * p_single_expression_arg = p_and(3, spaces, p_expression_fwd, spaces);
+    epc_parser_set_name(p_single_expression_arg, "single_expression_arg");
+    epc_parser_set_ast_action(p_single_expression_arg, AST_ACTION_PROMOTE_LAST_CHILD_AST);
 
     // A parser for one or more arguments separated by commas, allowing spaces around them.
     // E.g., "expr", "expr, expr"
-    parser_t * p_one_or_more_args = p_delimited(p_single_expression_arg, p_char(','));
-    p_name_set(p_one_or_more_args, "one_or_more_args");
-    p_set_ast_action(p_one_or_more_args, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_t * p_one_or_more_args = p_delimited(p_single_expression_arg, p_char(','));
+    epc_parser_set_name(p_one_or_more_args, "one_or_more_args");
+    epc_parser_set_ast_action(p_one_or_more_args, AST_ACTION_COLLECT_CHILD_RESULTS);
 
     // The actual argument list for a function call can be empty (e.g., func())
-    parser_t * p_args_list_optional = p_optional(p_one_or_more_args);
-    p_name_set(p_args_list_optional, "args_list");
-    p_set_ast_action(p_args_list_optional, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_t * p_args_list_optional = p_optional(p_one_or_more_args);
+    epc_parser_set_name(p_args_list_optional, "args_list");
+    epc_parser_set_ast_action(p_args_list_optional, AST_ACTION_PROMOTE_LAST_CHILD_AST);
 
     // Arguments enclosed in parentheses, using p_between for conciseness
-    parser_t * p_args_in_parens = p_between(oparen, p_args_list_optional, cparen);
-    p_name_set(p_args_in_parens, "args_in_parens");
-    p_set_ast_action(p_args_in_parens, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_t * p_args_in_parens = p_between(oparen, p_args_list_optional, cparen);
+    epc_parser_set_name(p_args_in_parens, "args_in_parens");
+    epc_parser_set_ast_action(p_args_in_parens, AST_ACTION_PROMOTE_LAST_CHILD_AST);
 
-    parser_t * p_function_call = p_and(
+    epc_parser_t * p_function_call = p_and(
         2,
         p_functions,
         p_args_in_parens
     );
-    p_name_set(p_function_call, "function_call");
-    p_set_ast_action(p_function_call, AST_ACTION_CREATE_FUNCTION_CALL);
-    parser_t * p_expression_in_parens = p_between(
+    epc_parser_set_name(p_function_call, "function_call");
+    epc_parser_set_ast_action(p_function_call, AST_ACTION_CREATE_FUNCTION_CALL);
+    epc_parser_t * p_expression_in_parens = p_between(
         p_and(2, oparen, spaces),
         p_expression_fwd,
         p_and(2, spaces, cparen)
     );
-    p_name_set(p_expression_in_parens, "expression_in_parens");
+    epc_parser_set_name(p_expression_in_parens, "expression_in_parens");
 
-    parser_t * p_factor = p_or(
+    epc_parser_t * p_factor = p_or(
         5,
         p_double_parser,
         p_constants,
@@ -235,49 +235,49 @@ create_formula_grammar(void)
         p_function_call,
         p_expression_in_parens
     );
-    p_set_ast_action(p_factor, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_set_ast_action(p_factor, AST_ACTION_PROMOTE_LAST_CHILD_AST);
 
-    parser_t * term_rest_unit = p_and(
+    epc_parser_t * term_rest_unit = p_and(
         4,
         spaces,
         p_mul_div_op,
         spaces,
         p_factor
     );
-    p_name_set(term_rest_unit, "term_rest_unit");
-    p_set_ast_action(term_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_set_name(term_rest_unit, "term_rest_unit");
+    epc_parser_set_ast_action(term_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    parser_t * p_term_suffix = p_many(term_rest_unit);
-    p_name_set(p_term_suffix, "term_suffix");
-    p_set_ast_action(p_term_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_t * p_term_suffix = p_many(term_rest_unit);
+    epc_parser_set_name(p_term_suffix, "term_suffix");
+    epc_parser_set_ast_action(p_term_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    parser_t * p_term = p_and(2, p_factor, p_term_suffix);
-    p_name_set(p_term, "term");
-    p_set_ast_action(p_term, AST_ACTION_BUILD_BINARY_EXPRESSION);
+    epc_parser_t * p_term = p_and(2, p_factor, p_term_suffix);
+    epc_parser_set_name(p_term, "term");
+    epc_parser_set_ast_action(p_term, AST_ACTION_BUILD_BINARY_EXPRESSION);
 
-    parser_t * expression_rest_unit = p_and(
+    epc_parser_t * expression_rest_unit = p_and(
         4,
         spaces,
         p_add_sub_op,
         spaces,
         p_term
     );
-    p_name_set(expression_rest_unit, "expression_rest_unit");
-    p_set_ast_action(expression_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_set_name(expression_rest_unit, "expression_rest_unit");
+    epc_parser_set_ast_action(expression_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    parser_t * p_expression_suffix = p_many(expression_rest_unit);
-    p_name_set(p_expression_suffix, "expression_suffix");
-    p_set_ast_action(p_expression_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_t * p_expression_suffix = p_many(expression_rest_unit);
+    epc_parser_set_name(p_expression_suffix, "expression_suffix");
+    epc_parser_set_ast_action(p_expression_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    parser_t * p_expression = p_and(2, p_term, p_expression_suffix);
-    p_name_set(p_expression, "expression");
-    p_set_ast_action(p_expression, AST_ACTION_BUILD_BINARY_EXPRESSION);
+    epc_parser_t * p_expression = p_and(2, p_term, p_expression_suffix);
+    epc_parser_set_name(p_expression, "expression");
+    epc_parser_set_ast_action(p_expression, AST_ACTION_BUILD_BINARY_EXPRESSION);
 
-    p_duplicate(p_expression_fwd, p_expression);
+    epc_parser_duplicate(p_expression_fwd, p_expression);
 
-    parser_t * complete_expression = p_and(2, p_expression, p_eoi());
-    p_name_set(complete_expression, "complete_expression");
-    p_set_ast_action(complete_expression, AST_ACTION_ASSIGN_ROOT);
+    epc_parser_t * complete_expression = p_and(2, p_expression, p_eoi());
+    epc_parser_set_name(complete_expression, "complete_expression");
+    epc_parser_set_ast_action(complete_expression, AST_ACTION_ASSIGN_ROOT);
 
     return complete_expression;
 }
@@ -307,22 +307,22 @@ parse_and_evaluate_formula(
     double x_value)
 {
     parse_and_evaulate_result_st result = {0};
-    parser_t * formula_grammar = create_formula_grammar();
+    epc_parser_t * formula_grammar = create_formula_grammar();
 
-    easy_mpc_parse_session_t parse_session = easy_mpc_parse(formula_grammar, input_expr);
+    epc_parse_session_t parse_session = epc_parse_input(formula_grammar, input_expr);
 
     if (!parse_session.result.is_error)
     {
         ast_builder_data_t ast_builder_data;
         ast_builder_init(&ast_builder_data);
 
-        pt_visitor_t ast_builder_visitor = {
+        epc_cpt_visitor_t ast_builder_visitor = {
             .enter_node = ast_builder_enter_node,
             .exit_node = ast_builder_exit_node,
             .user_data = &ast_builder_data
         };
 
-        pt_visit(parse_session.result.data.success, &ast_builder_visitor);
+        epc_cpt_visit_nodes(parse_session.result.data.success, &ast_builder_visitor);
 
         if (ast_builder_data.has_error)
         {
@@ -371,7 +371,7 @@ parse_and_evaluate_formula(
         result.message = msg;
     }
 
-    easy_mpc_parse_session_destroy(&parse_session);
+    epc_parse_session_destroy(&parse_session);
 
     return result;
 }

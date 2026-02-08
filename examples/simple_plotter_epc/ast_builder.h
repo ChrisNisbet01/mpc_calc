@@ -31,10 +31,10 @@ typedef struct {
 
 // Visitor callbacks
 void
-ast_builder_enter_node(pt_node_t* node, void* user_data);
+ast_builder_enter_node(epc_cpt_node_t* node, void* user_data);
 
 void
-ast_builder_exit_node(pt_node_t* node, void* user_data);
+ast_builder_exit_node(epc_cpt_node_t* node, void* user_data);
 
 // Function to initialize the AST builder data
 void
