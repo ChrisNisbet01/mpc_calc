@@ -25,7 +25,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 add_subdirectory(lib)
-add_subdirectory(../easy_mpc ${CMAKE_CURRENT_BINARY_DIR}/easy_mpc_build)
+add_subdirectory(../easy_pc ${CMAKE_CURRENT_BINARY_DIR}/easy_pc_build)
 add_subdirectory(examples)
 
 # --- Unit Tests ---

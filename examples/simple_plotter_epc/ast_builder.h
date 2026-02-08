@@ -1,7 +1,7 @@
 #pragma once
 
 #include "ast.h"
-#include "easy_mpc/easy_mpc.h"
+#include "easy_pc/easy_pc.h"
 
 // AST Action Definitions for Semantic Actions
 typedef enum {

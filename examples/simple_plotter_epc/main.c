@@ -10,7 +10,7 @@
 #define RAYGUI_IMPLEMENTATION
 #include <raygui.h>
 
-#include "easy_mpc/easy_mpc.h"
+#include "easy_pc/easy_pc.h"
 #include "ast.h"
 #include "ast_builder.h"
 #include "ast_evaluator.h"

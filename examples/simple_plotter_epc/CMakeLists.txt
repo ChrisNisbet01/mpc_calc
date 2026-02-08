@@ -47,7 +47,7 @@ add_dependencies(simple_plotter_epc generate_font_header_epc)
 
 
 target_link_libraries(simple_plotter_epc PRIVATE
-    easy_mpc
+    easy_pc
     raylib
     m
 )
@@ -56,7 +56,7 @@ target_include_directories(simple_plotter_epc PRIVATE
     ${raygui_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR} # For ast.h, ast_builder.h, ast_evaluator.h, function_definitions.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../../easy_mpc/include # For easy_mpc.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../easy_pc/include # For easy_mpc.h
 )
 
 target_compile_features(simple_plotter_epc PRIVATE c_std_11) # Enable C11 features
