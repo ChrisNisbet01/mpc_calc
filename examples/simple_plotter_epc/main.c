@@ -76,7 +76,6 @@ typedef struct make_functions_cb_ctx
 } make_functions_cb_ctx;
 
 // Function prototypes
-static void recalculate_graph(void);
 static Vector2 WorldToScreen(Vector2 worldPoint, Rectangle graphRect);
 static Vector2 ScreenToWorld(Vector2 screenPoint, Rectangle graphRect);
 
@@ -278,10 +277,10 @@ typedef struct parse_and_evaluate_result_st
         double value;
         char * message;
     };
-} parse_and_evaulate_result_st;
+} parse_and_evaluate_result_st;
 
 static void
-parse_and_evaluate_result_cleanup(parse_and_evaulate_result_st * result)
+parse_and_evaluate_result_cleanup(parse_and_evaluate_result_st * result)
 {
     if (!result->success)
     {
@@ -290,18 +289,32 @@ parse_and_evaluate_result_cleanup(parse_and_evaulate_result_st * result)
     memset(result, 0, sizeof(*result));
 };
 
-static parse_and_evaulate_result_st
-parse_and_evaluate_formula(
+static parse_and_evaluate_result_st
+parse_and_evaluate(
+    epc_parser_t * formula_parser,
     char const * const input_expr,
-    double x_value)
+    size_t num_variables,
+    variable_t const * variables)
 {
-    parse_and_evaulate_result_st result = {0};
-    epc_parser_t * formula_grammar = create_formula_grammar();
+    parse_and_evaluate_result_st result = {0};
 
-    epc_parse_session_t parse_session = epc_parse_input(formula_grammar, input_expr);
+    fprintf(stdout, "Parsing: \"%s\"\n", input_expr);
+
+    epc_parse_session_t parse_session = epc_parse_input(formula_parser, input_expr);
 
     if (!parse_session.result.is_error)
     {
+        fprintf(stdout, "Parse successful!\n");
+        //char * cpt_str = epc_cpt_to_string(parse_session.internal_parse_ctx, parse_session.result.data.success, 0);
+        char * cpt_str = NULL;
+        if (cpt_str != NULL)
+        {
+            fprintf(stdout, "--- CPT ---\n");
+            fprintf(stdout, "%s", cpt_str);
+            free(cpt_str);
+            fprintf(stdout, "-----------\n");
+        }
+
         ast_builder_data_t ast_builder_data;
         ast_builder_init(&ast_builder_data);
 
@@ -315,7 +328,13 @@ parse_and_evaluate_formula(
 
         if (ast_builder_data.has_error)
         {
-            result.message = strdup(ast_builder_data.error_message);
+            char * msg = NULL;
+            int len = asprintf(&msg, "Error: %s", ast_builder_data.error_message);
+            if (len < 0)
+            {
+                msg = strdup("memory allocation error");
+            }
+            result.message = msg;
         }
         else if (ast_builder_data.ast_root == NULL)
         {
@@ -323,13 +342,8 @@ parse_and_evaluate_formula(
         }
         else
         {
-            variable_t variables[1] = {
-                {
-                    .name = "x",
-                    .value = x_value,
-                }
-            };
-            double calculated_result = evaluate_ast(ast_builder_data.ast_root, variables, 1);
+            //double calculated_result = evaluate_ast(ast_builder_data.ast_root, variables, num_variables);
+            double calculated_result = 1.0;
 
             result.success = true;
             result.value = calculated_result;
@@ -339,37 +353,29 @@ parse_and_evaluate_formula(
     else
     {
         char *msg = NULL;
-        size_t input_len = strlen(input_expr);
-        const char *error_pos_str = parse_session.result.data.error->input_position;
-        size_t error_pos_len = (error_pos_str && error_pos_str >= input_expr && error_pos_str <= input_expr + input_len) ?
-                               (input_expr + input_len - error_pos_str) : 0;
-
-
         int len = asprintf(&msg, "Error: %s at '%.*s' (expected '%s', found '%.*s')",
             parse_session.result.data.error->message,
-            (int)error_pos_len,
-            error_pos_str ? error_pos_str : "",
+            (int)(input_expr + strlen(input_expr) - parse_session.result.data.error->input_position),
+            parse_session.result.data.error->input_position,
             parse_session.result.data.error->expected ? parse_session.result.data.error->expected : "N/A",
             (int)strlen(parse_session.result.data.error->found),
             parse_session.result.data.error->found ? parse_session.result.data.error->found : "N/A"
         );
         if (len < 0)
         {
-            msg = strdup("memory allocation error in error message");
+            msg = strdup("memory allocation error");
         }
         result.message = msg;
     }
 
+    // Destroy the parse session, which frees the internal parse context.
     epc_parse_session_destroy(&parse_session);
 
     return result;
 }
 
-
-
-
 static void
-recalculate_graph(void)
+recalculate_graph(epc_parser_t * formula_grammar)
 {
     // Cleanup previous formula and points
     if (NULL != graphPoints)
@@ -389,14 +395,26 @@ recalculate_graph(void)
     }
 
     // Parse formula once for structural correctness
-    parse_and_evaulate_result_st initial_parse_result = parse_and_evaluate_formula(formulaInputText, 0.0f); // x doesn't matter for initial parse check
-
-    if (!initial_parse_result.success)
+    variable_t variables[1] = {
+        {
+            .name = "x",
+            .value = 0,
+        }
+    };
     {
-        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error compiling formula '%s': %s", formulaInputText, initial_parse_result.message);
+        // x doesn't matter for initial parse check
+        parse_and_evaluate_result_st initial_parse_result =
+            parse_and_evaluate(formula_grammar, formulaInputText, 1, variables);
+
+        if (!initial_parse_result.success)
+        {
+            snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error compiling formula '%s': %s", formulaInputText, initial_parse_result.message);
+            parse_and_evaluate_result_cleanup(&initial_parse_result);
+            return;
+        }
         parse_and_evaluate_result_cleanup(&initial_parse_result);
-        return;
     }
+
     snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
 
     // Generate graph points
@@ -407,7 +425,6 @@ recalculate_graph(void)
     if (NULL == graphPoints)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory for graph points.");
-        parse_and_evaluate_result_cleanup(&initial_parse_result); // Cleanup for the initial parse
         return;
     }
 
@@ -426,7 +443,14 @@ recalculate_graph(void)
             break;
         }
 
-        parse_and_evaulate_result_st eval_result = parse_and_evaluate_formula(formulaInputText, current_x);
+        variable_t variables[1] = {
+            {
+                .name = "x",
+                .value = current_x,
+            }
+        };
+
+        parse_and_evaluate_result_st eval_result = parse_and_evaluate(formula_grammar, formulaInputText, 1, variables);
 
         if (!eval_result.success)
         {
@@ -468,7 +492,6 @@ recalculate_graph(void)
                 MemFree(graphPoints);
                 graphPoints = NULL;
                 graphPointsCount = 0;
-                parse_and_evaluate_result_cleanup(&initial_parse_result); // Cleanup for the initial parse
                 return;
             }
             graphPoints = newGraphPoints;
@@ -483,8 +506,6 @@ recalculate_graph(void)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "No valid points to plot for '%s'", formulaInputText);
     }
-
-    parse_and_evaluate_result_cleanup(&initial_parse_result); // Final cleanup for the initial parse
 }
 
 
@@ -551,7 +572,9 @@ main(int argc, char ** argv)
     GuiSetFont(font);
 
     // Initial parsing of default formula
-    recalculate_graph(); // Use the new function
+    epc_parser_t * formula_grammar = create_formula_grammar();
+
+    recalculate_graph(formula_grammar);
 
     /* Main game loop */
     while (!WindowShouldClose())
@@ -768,7 +791,7 @@ main(int argc, char ** argv)
 
         if (should_recalculate_graph)
         {
-            recalculate_graph();
+            recalculate_graph(formula_grammar);
             drawGraphPressed = false; // Reset button state
             prevLogXScale = logXScale; // Update previous state
         }

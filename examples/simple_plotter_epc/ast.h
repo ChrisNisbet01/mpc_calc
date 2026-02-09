@@ -3,7 +3,7 @@
 #include "function_definitions.h"
 
 typedef enum {
-    AST_NODE_TYPE_NULL,
+    AST_NODE_TYPE_PLACEHOLDER,
     AST_NODE_TYPE_NUMBER,
     AST_NODE_TYPE_OPERATOR,
     AST_NODE_TYPE_EXPRESSION,

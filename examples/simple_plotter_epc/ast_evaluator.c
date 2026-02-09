@@ -105,8 +105,8 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
             fprintf(stderr, "Error: Attempted to evaluate an operator node directly.\n");
             return NAN;
 
-        case AST_NODE_TYPE_NULL:
-            fprintf(stderr, "Error: Evaluated a NULL-type node.\n");
+        case AST_NODE_TYPE_PLACEHOLDER:
+            fprintf(stderr, "Error: Evaluated a PLACEHOLDER-type node.\n");
             return NAN;
 
         default:
