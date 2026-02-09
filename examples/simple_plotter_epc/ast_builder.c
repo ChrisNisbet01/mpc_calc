@@ -23,7 +23,9 @@
 static void set_error(ast_builder_data_t * data, epc_cpt_node_t * pt_node, const char * format, ...)
 {
     if (data->has_error)
+    {
         return; // Don't overwrite the first error
+    }
 
     data->has_error = true;
     /* TODO: Is there a memory leak here if ast_root is non-NULL? */
@@ -59,7 +61,6 @@ ast_node_free(ast_node_t * node)
         return;
     }
 
-    /* TODO: Free any memory/nodes associated with this node type. */
     switch(node->type)
     {
         case AST_NODE_TYPE_NUMBER:
@@ -130,6 +131,7 @@ ast_node_alloc(ast_builder_data_t * data, ast_node_type_t node_type)
     {
         node->type = node_type;
     }
+
     return node;
 }
 
@@ -218,7 +220,8 @@ is_placeholder_node(ast_node_t * node)
 static void
 push_placeholder_node(ast_builder_data_t * data)
 {
-    ast_node_t * placeholder_node = ast_node_alloc(data, AST_NODE_TYPE_PLACEHOLDER);
+    ast_node_t * placeholder_node =
+        ast_node_alloc(data, AST_NODE_TYPE_PLACEHOLDER);
     if (placeholder_node == NULL)
     {
         return;
@@ -254,7 +257,8 @@ ast_builder_cleanup(ast_builder_data_t * data)
     data->ast_root = NULL;
 }
 
-void ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
+void
+ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
 {
     ast_builder_data_t * data = (ast_builder_data_t *)user_data;
     if (data->has_error || pt_node == NULL)
@@ -305,6 +309,7 @@ void ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
         push_placeholder_node(data);
         break;
     }
+
     case AST_ACTION_NONE:
         break;
     }
@@ -402,13 +407,8 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             return;
         }
         ast_node_t * own_placeholder = ast_stack_pop(data);
-        if (own_placeholder == NULL)
-        {
-            ast_node_free(op_operand_pairs_list_node);
-            ast_node_free(initial_operand_node);
-            return;
-        }
-        if (!is_placeholder_node(own_placeholder))
+
+        if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
             set_error(data, pt_node, "Internal error: bad placeholder for BUILD_BINARY_EXPRESSION");
             ast_node_free(op_operand_pairs_list_node);
@@ -416,6 +416,7 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             ast_node_free(own_placeholder);
             return;
         }
+
         ast_node_free(own_placeholder);
 
         ast_node_t * final_expression_node;
@@ -482,6 +483,8 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             set_error(data, pt_node, "Internal error: bad placeholder for COLLECT_CHILD_RESULTS");
             return;
         }
+        /* popped_node will be the placeholder node. */
+        ast_node_free(popped_node);
 
         ast_node_t * collected_list_node = ast_node_alloc(data, AST_NODE_TYPE_LIST);
         if (collected_list_node == NULL)
@@ -526,18 +529,16 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
         }
 
         ast_node_t * own_placeholder = ast_stack_pop(data);
-        if (own_placeholder == NULL)
-        {
-            ast_node_free(child_ast);
-            return;
-        }
 
-        if (!is_placeholder_node(own_placeholder))
+        if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
+            ast_node_free(own_placeholder);
             ast_node_free(child_ast);
             set_error(data, pt_node, "Internal error: bad placeholder for PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST");
             return;
         }
+
+        ast_node_free(own_placeholder);
 
         ast_stack_push(data, child_ast);
         break;
@@ -550,19 +551,19 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
         {
             return;
         }
-        ast_node_t * own_placeholder = ast_stack_pop(data);
-        if (own_placeholder == NULL)
-        {
-            ast_node_free(child_ast);
-            return;
-        }
 
-        if (!is_placeholder_node(own_placeholder))
+        ast_node_t * own_placeholder = ast_stack_pop(data);
+
+        if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
+            ast_node_free(own_placeholder);
             ast_node_free(child_ast);
             set_error(data, pt_node, "Internal error: bad placeholder for PROMOTE_LAST_CHILD_AST");
             return;
         }
+
+        ast_node_free(own_placeholder);
+
         ast_stack_push(data, child_ast);
         break;
     }
@@ -575,6 +576,7 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             return;
         }
         ast_node_t * own_placeholder = ast_stack_pop(data);
+
         if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
             ast_node_free(child_ast);
@@ -582,6 +584,8 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             set_error(data, pt_node, "Internal error: bad placeholder for ASSIGN_ROOT");
             return;
         }
+
+        ast_node_free(own_placeholder);
 
         data->ast_root = child_ast;
         break;
@@ -605,6 +609,7 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             return;
         }
         ast_node_t * own_placeholder = ast_stack_pop(data);
+
         if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
             ast_node_free(args_list_node);
@@ -657,12 +662,14 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
     case AST_ACTION_CREATE_IDENTIFIER:
     {
         ast_node_t * own_placeholder = ast_stack_pop(data);
+
         if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
             ast_node_free(own_placeholder);
             set_error(data, pt_node, "Internal error: bad placeholder for CREATE_IDENTIFIER");
             return;
         }
+
         ast_node_free(own_placeholder);
 
         ast_node_t * ident_node = ast_node_alloc(data, AST_NODE_TYPE_IDENTIFIER);

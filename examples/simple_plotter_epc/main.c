@@ -298,21 +298,21 @@ parse_and_evaluate(
 {
     parse_and_evaluate_result_st result = {0};
 
-    fprintf(stdout, "Parsing: \"%s\"\n", input_expr);
+    //fprintf(stdout, "Parsing: \"%s\"\n", input_expr);
 
     epc_parse_session_t parse_session = epc_parse_input(formula_parser, input_expr);
 
     if (!parse_session.result.is_error)
     {
-        fprintf(stdout, "Parse successful!\n");
-        //char * cpt_str = epc_cpt_to_string(parse_session.internal_parse_ctx, parse_session.result.data.success, 0);
-        char * cpt_str = NULL;
-        if (cpt_str != NULL)
+        char * cpt_str = epc_cpt_to_string(parse_session.internal_parse_ctx, parse_session.result.data.success, 0);
+
+        if (cpt_str)
         {
-            fprintf(stdout, "--- CPT ---\n");
-            fprintf(stdout, "%s", cpt_str);
+            //fprintf(stdout, "Parse successful!\n");
+            //fprintf(stdout, "--- CPT ---\n");
+            //fprintf(stdout, "%s", cpt_str);
+            //fprintf(stdout, "-----------\n");
             free(cpt_str);
-            fprintf(stdout, "-----------\n");
         }
 
         ast_builder_data_t ast_builder_data;
@@ -342,8 +342,7 @@ parse_and_evaluate(
         }
         else
         {
-            //double calculated_result = evaluate_ast(ast_builder_data.ast_root, variables, num_variables);
-            double calculated_result = 1.0;
+            double calculated_result = evaluate_ast(ast_builder_data.ast_root, variables, num_variables);
 
             result.success = true;
             result.value = calculated_result;
