@@ -89,22 +89,24 @@ make_functions_cb(function_t const * const func, void * const ctx)
     {
         if (cb_ctx->p_unary_functions == NULL)
         {
-            cb_ctx->p_unary_functions = epc_string(func->name);
+            cb_ctx->p_unary_functions = epc_string(func->name, func->name);
         }
         else
         {
-            cb_ctx->p_unary_functions = epc_or(2, cb_ctx->p_unary_functions, epc_string(func->name));
+            epc_parser_t * fn = epc_string(func->name, func->name);
+            cb_ctx->p_unary_functions = epc_or("or_func", 2, cb_ctx->p_unary_functions, fn);
         }
     }
     else if (func->num_args == 2)
     {
         if (cb_ctx->p_binary_functions == NULL)
         {
-            cb_ctx->p_binary_functions = epc_string(func->name);
+            cb_ctx->p_binary_functions = epc_string(func->name, func->name);
         }
         else
         {
-            cb_ctx->p_binary_functions = epc_or(2, cb_ctx->p_binary_functions, epc_string(func->name));
+            epc_parser_t * fn = epc_string(func->name, func->name);
+            cb_ctx->p_binary_functions = epc_or("or_func", 2, cb_ctx->p_binary_functions, fn);
         }
     }
 
@@ -120,23 +122,18 @@ make_functions_parser(void)
 
     if (cb_ctx.p_binary_functions != NULL)
     {
-        p_functions = cb_ctx.p_binary_functions;
+        p_functions = epc_passthru("functions", cb_ctx.p_binary_functions);
     }
     if (cb_ctx.p_unary_functions != NULL)
     {
         if (p_functions == NULL)
         {
-            p_functions = cb_ctx.p_unary_functions;
+            p_functions = epc_passthru("functions", cb_ctx.p_unary_functions);
         }
         else
         {
-            p_functions = epc_or(2, p_functions, cb_ctx.p_unary_functions);
+            p_functions = epc_or("functions", 2, p_functions, cb_ctx.p_unary_functions);
         }
-    }
-
-    if (p_functions != NULL)
-    {
-        epc_parser_set_name(p_functions, "functions");
     }
 
     return p_functions;
@@ -145,42 +142,37 @@ make_functions_parser(void)
 static epc_parser_t *
 create_formula_grammar(void)
 {
-    epc_parser_t * p_double_parser = epc_double();
-    epc_parser_set_name(p_double_parser, "number");
+    epc_parser_t * p_double_parser = epc_double("number");
     epc_parser_set_ast_action(p_double_parser, AST_ACTION_CREATE_NUMBER_FROM_CONTENT);
 
-    epc_parser_t * p_const_pi = epc_string("pi");
-    epc_parser_set_name(p_const_pi, "pi");
-    epc_parser_t * p_const_e = epc_string("e");
-    epc_parser_set_name(p_const_e, "e");
-    epc_parser_t * p_constants = epc_or(2, p_const_pi, p_const_e);
-    epc_parser_set_name(p_constants, "constants");
+    epc_parser_t * p_const_pi = epc_string("const_pi", "pi");
+    epc_parser_t * p_const_e = epc_string("const_e", "e");
+
+    epc_parser_t * p_constants = epc_or("constants", 2, p_const_pi, p_const_e);
     epc_parser_set_ast_action(p_constants, AST_ACTION_CREATE_IDENTIFIER);
-    epc_parser_t * oparen = epc_char('(');
-    epc_parser_t * cparen = epc_char(')');
 
-    epc_parser_t * p_var_x = epc_string("x");
-    epc_parser_set_name(p_var_x, "var_x");
+    epc_parser_t * oparen = epc_char("oparen", '(');
+    epc_parser_t * cparen = epc_char("cparen", ')');
+    epc_parser_t * p_space = epc_space("space");
+    epc_parser_t * spaces = epc_many("spaces", p_space);
+    epc_parser_t * p_comma = epc_char("comma", ',');
 
-    epc_parser_t * p_variables = epc_or(1, p_var_x);
-    epc_parser_set_name(p_variables, "variable");
+    epc_parser_t * p_var_x = epc_string("var_x", "x");
+
+    epc_parser_t * p_variables = epc_or("variable", 1, p_var_x);
     epc_parser_set_ast_action(p_variables, AST_ACTION_CREATE_IDENTIFIER);
 
     // Additive operators
-    epc_parser_t * p_plus_char = epc_char('+');
-    epc_parser_t * p_minus_char = epc_char('-');
-    epc_parser_t * p_add_sub_op = epc_or(2, p_plus_char, p_minus_char);
-    epc_parser_set_name(p_add_sub_op, "add_sub_op");
+    epc_parser_t * p_plus_char = epc_char("+", '+');
+    epc_parser_t * p_minus_char = epc_char("-", '-');
+    epc_parser_t * p_add_sub_op = epc_or("add_sub_op", 2, p_plus_char, p_minus_char);
     epc_parser_set_ast_action(p_add_sub_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
 
     // Multiplicative operators
-    epc_parser_t * p_multiply_char = epc_char('*');
-    epc_parser_t * p_divide_char = epc_char('/');
-    epc_parser_t * p_mul_div_op = epc_or(2, p_multiply_char, p_divide_char);
-    epc_parser_set_name(p_mul_div_op, "mul_div_op");
+    epc_parser_t * p_multiply_char = epc_char("*", '*');
+    epc_parser_t * p_divide_char = epc_char("/", '/'); // Placeholder for future, not used in this test
+    epc_parser_t * p_mul_div_op = epc_or("mul_div_op", 2, p_multiply_char, p_divide_char);
     epc_parser_set_ast_action(p_mul_div_op, AST_ACTION_CREATE_OPERATOR_FROM_CHAR);
-
-    epc_parser_t * spaces = epc_many(epc_space());
 
     epc_parser_t * p_functions = make_functions_parser();
     epc_parser_set_ast_action(p_functions, AST_ACTION_CREATE_IDENTIFIER);
@@ -190,32 +182,44 @@ create_formula_grammar(void)
 
     // Argument list parser using new combinators
     // Parser for a single expression argument (potentially surrounded by spaces)
-    epc_parser_t * p_single_expression_arg = epc_and(3, spaces, p_expression_fwd, spaces);
-    epc_parser_set_name(p_single_expression_arg, "single_expression_arg");
-    epc_parser_set_ast_action(p_single_expression_arg, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_t * p_single_expression_arg = epc_and("single_expression_arg", 3, spaces, p_expression_fwd, spaces);
+    epc_parser_set_ast_action(p_single_expression_arg, AST_ACTION_PROMOTE_LAST_CHILD_AST); // Promote the expression itself
 
     // A parser for one or more arguments separated by commas, allowing spaces around them.
     // E.g., "expr", "expr, expr"
-    epc_parser_t * p_one_or_more_args = epc_delimited(p_single_expression_arg, epc_char(','));
-    epc_parser_set_name(p_one_or_more_args, "one_or_more_args");
-    epc_parser_set_ast_action(p_one_or_more_args, AST_ACTION_COLLECT_CHILD_RESULTS);
+    epc_parser_t * p_one_or_more_args = epc_delimited("one_or_more_args", p_single_expression_arg, p_comma);
+    epc_parser_set_ast_action(p_one_or_more_args, AST_ACTION_COLLECT_CHILD_RESULTS); // Collect all argument AST nodes
+
+    /*
+     * As the optional parser only pushes a CPT node with a child on it if the optional is found,
+     * we need a special handler that creates an empty list if this child node isn't present.
+     */
+    epc_parser_t * p_zero_or_more_args_optional = epc_optional("optional_args_list", p_one_or_more_args);
+    epc_parser_set_ast_action(p_zero_or_more_args_optional, AST_ACTION_PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST);
 
     // Arguments enclosed in parentheses, using p_between for conciseness
-    epc_parser_t * p_args_in_parens = epc_between(oparen, p_one_or_more_args, cparen);
-    epc_parser_set_name(p_args_in_parens, "args_in_parens");
-    epc_parser_set_ast_action(p_args_in_parens, AST_ACTION_PROMOTE_LAST_CHILD_AST);
+    epc_parser_t * p_args_in_parens = epc_between("args_in_parens", oparen, p_zero_or_more_args_optional, cparen);
+    epc_parser_set_ast_action(p_args_in_parens, AST_ACTION_PROMOTE_LAST_CHILD_AST); // Promote the optional args list
 
-    epc_parser_t * p_function_call = epc_and(2, p_functions, p_args_in_parens);
-    epc_parser_set_name(p_function_call, "function_call");
-    epc_parser_set_ast_action(p_function_call, AST_ACTION_CREATE_FUNCTION_CALL);
-    epc_parser_t * p_expression_in_parens = epc_between(
-        epc_and(2, oparen, spaces),
-        p_expression_fwd,
-        epc_and(2, spaces, cparen)
+    epc_parser_t * p_function_call = epc_and(
+        "function_call",
+        2,
+        p_functions,
+        p_args_in_parens
     );
-    epc_parser_set_name(p_expression_in_parens, "expression_in_parens");
+    epc_parser_set_ast_action(p_function_call, AST_ACTION_CREATE_FUNCTION_CALL);
+
+    epc_parser_t * oparen_spaces = epc_and("oparen_spaces", 2, oparen, spaces);
+    epc_parser_t * spaces_cparen = epc_and("spaces_cparen", 2, spaces, cparen);
+    epc_parser_t * p_expression_in_parens = epc_between(
+        "expression_in_parens",
+        oparen_spaces,
+        p_expression_fwd,         // Wrapped expression epc_and(2, spaces, cparen)
+        spaces_cparen
+    );
 
     epc_parser_t * p_factor = epc_or(
+        "factor",
         5,
         p_double_parser,
         p_constants,
@@ -225,46 +229,44 @@ create_formula_grammar(void)
     );
     epc_parser_set_ast_action(p_factor, AST_ACTION_PROMOTE_LAST_CHILD_AST);
 
+    // term = factor ( (any_space mul_div_op any_space) factor )*
     epc_parser_t * term_rest_unit = epc_and(
+        "term_rest_unit",
         4,
         spaces,
         p_mul_div_op,
         spaces,
         p_factor
     );
-    epc_parser_set_name(term_rest_unit, "term_rest_unit");
     epc_parser_set_ast_action(term_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    epc_parser_t * p_term_suffix = epc_many(term_rest_unit);
-    epc_parser_set_name(p_term_suffix, "term_suffix");
+    epc_parser_t * p_term_suffix = epc_many("term_suffix", term_rest_unit);
     epc_parser_set_ast_action(p_term_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    epc_parser_t * p_term = epc_and(2, p_factor, p_term_suffix);
-    epc_parser_set_name(p_term, "term");
+    epc_parser_t * p_term = epc_and("term", 2, p_factor, p_term_suffix);
     epc_parser_set_ast_action(p_term, AST_ACTION_BUILD_BINARY_EXPRESSION);
 
     epc_parser_t * expression_rest_unit = epc_and(
+        "expression_rest_unit",
         4,
         spaces,
         p_add_sub_op,
         spaces,
         p_term
     );
-    epc_parser_set_name(expression_rest_unit, "expression_rest_unit");
     epc_parser_set_ast_action(expression_rest_unit, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    epc_parser_t * p_expression_suffix = epc_many(expression_rest_unit);
-    epc_parser_set_name(p_expression_suffix, "expression_suffix");
+    epc_parser_t * p_expression_suffix = epc_many("expression_suffix", expression_rest_unit);
     epc_parser_set_ast_action(p_expression_suffix, AST_ACTION_COLLECT_CHILD_RESULTS);
 
-    epc_parser_t * p_expression = epc_and(2, p_term, p_expression_suffix);
-    epc_parser_set_name(p_expression, "expression");
+    epc_parser_t * p_expression = epc_and("expression", 2, p_term, p_expression_suffix);
     epc_parser_set_ast_action(p_expression, AST_ACTION_BUILD_BINARY_EXPRESSION);
 
     epc_parser_duplicate(p_expression_fwd, p_expression);
 
-    epc_parser_t * complete_expression = epc_and(2, p_expression, epc_eoi());
-    epc_parser_set_name(complete_expression, "complete_expression");
+    // Top-level parser including EOI
+    epc_parser_t * eoi = epc_eoi("end_of_input");
+    epc_parser_t * complete_expression = epc_and("complete_expression", 2, p_expression, eoi);
     epc_parser_set_ast_action(complete_expression, AST_ACTION_ASSIGN_ROOT);
 
     return complete_expression;
