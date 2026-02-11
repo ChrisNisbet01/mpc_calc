@@ -8,10 +8,11 @@ typedef enum {
     AST_ACTION_NONE,
     AST_ACTION_CREATE_NUMBER_FROM_CONTENT, // Create AST_TYPE_NUMBER from parser content (long long)
     AST_ACTION_CREATE_OPERATOR_FROM_CHAR,  // Create AST_TYPE_OPERATOR from parser content (char)
+    AST_ACTION_CREATE_UNARY_FROM_CHAR_OR_PLUS, // CREATE AST_TYPE UNARY from parser content if present, else UNARY +
     AST_ACTION_COLLECT_CHILD_RESULTS,      // Collect all AST results from successful children into a list
     AST_ACTION_BUILD_BINARY_EXPRESSION,    // Build binary expression from (left, op_list, right_list)
     AST_ACTION_PROMOTE_LAST_CHILD_AST,     // For structural nodes that just pass through one child's AST
-    AST_ACTION_PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST, // For structural nodes that just pass through one child's AST or an empty list is no child AST is found.
+    AST_ACTION_PROMOTE_ARGS_LIST_AST_OR_EMPTY_LIST, // For structural nodes that just pass through one child's AST or an empty list is no child AST is found.
     AST_ACTION_CREATE_IDENTIFIER,          // Create an identifier node (for functions, constants, variables)
     AST_ACTION_CREATE_FUNCTION_CALL,       // For function_call = name '(' args ')'
     AST_ACTION_ASSIGN_ROOT,                // Sets the root node of the AST. (Should be the top of the node stack)

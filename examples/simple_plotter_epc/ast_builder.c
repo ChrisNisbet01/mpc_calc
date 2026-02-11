@@ -1,15 +1,15 @@
 #include "ast_builder.h"
+
 #include "ast.h"
 #include "function_definitions.h"
 
+#include <math.h>
+#include <stdarg.h>
 #include <stdbool.h>
-#include <stdlib.h> // For strtod
-#include <string.h> // For strncpy, memset
-#include <stdio.h>  // For fprintf (debug)
-#include <stdarg.h> // For va_list, etc.
-#include <math.h> // for M_PI, M_E
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// Add this at the top of the file for debug context
 #define AST_DEBUG_PRINT_ENABLE 0 // Set to 1 to enable debug prints
 
 #if AST_DEBUG_PRINT_ENABLE
@@ -18,9 +18,8 @@
 #define AST_DEBUG_PRINT(...) do {} while (0)
 #endif
 
-// --- Error Handling ---
-
-static void set_error(ast_builder_data_t * data, epc_cpt_node_t * pt_node, const char * format, ...)
+static void
+set_error(ast_builder_data_t * data, epc_cpt_node_t * pt_node, const char * format, ...)
 {
     if (data->has_error)
     {
@@ -109,7 +108,6 @@ ast_node_free(ast_node_t * node)
         case AST_NODE_TYPE_IDENTIFIER:
             free((char *)node->data.identifier.name);
             break;
-
     }
 
     free(node);
@@ -231,7 +229,8 @@ push_placeholder_node(ast_builder_data_t * data)
 
 // --- AST Builder Functions ---
 
-void ast_builder_init(ast_builder_data_t * data)
+void
+ast_builder_init(ast_builder_data_t * data)
 {
     memset(data, 0, sizeof(*data));
 }
@@ -287,6 +286,7 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
         ast_stack_push(data, num_node);
         break;
     }
+
     case AST_ACTION_CREATE_OPERATOR_FROM_CHAR:
     {
         ast_node_t * op_node = ast_node_alloc(data, AST_NODE_TYPE_OPERATOR);
@@ -298,11 +298,11 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
         ast_stack_push(data, op_node);
         break;
     }
+
     case AST_ACTION_CREATE_IDENTIFIER:
     case AST_ACTION_COLLECT_CHILD_RESULTS:
     case AST_ACTION_BUILD_BINARY_EXPRESSION:
-    case AST_ACTION_PROMOTE_LAST_CHILD_AST:
-    case AST_ACTION_PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST:
+    case AST_ACTION_PROMOTE_ARGS_LIST_AST_OR_EMPTY_LIST:
     case AST_ACTION_ASSIGN_ROOT:
     case AST_ACTION_CREATE_FUNCTION_CALL:
     {
@@ -378,8 +378,8 @@ build_binary_tree(ast_builder_data_t * data, ast_node_t * first_operand, ast_lis
     return current_expr_node;
 }
 
-
-void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
+void
+ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
 {
     ast_builder_data_t * data = (ast_builder_data_t *)user_data;
     if (data->has_error || pt_node == NULL)
@@ -505,7 +505,7 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
         break;
     }
 
-    case AST_ACTION_PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST:
+    case AST_ACTION_PROMOTE_ARGS_LIST_AST_OR_EMPTY_LIST:
     {
         ast_node_t * child_ast = ast_stack_pop(data);
         if (child_ast == NULL)
@@ -535,30 +535,6 @@ void ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
             ast_node_free(own_placeholder);
             ast_node_free(child_ast);
             set_error(data, pt_node, "Internal error: bad placeholder for PROMOTE_LAST_CHILD_AST_OR_EMPTY_LIST");
-            return;
-        }
-
-        ast_node_free(own_placeholder);
-
-        ast_stack_push(data, child_ast);
-        break;
-    }
-
-    case AST_ACTION_PROMOTE_LAST_CHILD_AST:
-    {
-        ast_node_t * child_ast = ast_stack_pop(data);
-        if (child_ast == NULL)
-        {
-            return;
-        }
-
-        ast_node_t * own_placeholder = ast_stack_pop(data);
-
-        if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
-        {
-            ast_node_free(own_placeholder);
-            ast_node_free(child_ast);
-            set_error(data, pt_node, "Internal error: bad placeholder for PROMOTE_LAST_CHILD_AST");
             return;
         }
 

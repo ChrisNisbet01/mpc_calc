@@ -39,6 +39,10 @@ typedef struct {
 } ast_operator_t;
 
 typedef struct {
+    char operator_char;
+} ast_unary_t;
+
+typedef struct {
     ast_node_t* left;
     ast_node_t* operator_node;
     ast_node_t* right;
