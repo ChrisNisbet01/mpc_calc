@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
-project(simple_plotter C)
+
+set(app "plotter")
+project(${app} C)
 
 include(FetchContent)
 
@@ -32,24 +34,32 @@ add_custom_command(
 )
 
 add_custom_target(
-    generate_font_header ALL
+    generate_font_header_epc ALL
     DEPENDS ${FONT_HEADER_PATH}
 )
 
-add_executable(simple_plotter
+add_executable(${app}
     main.c
+    ast_builder.c
+    ast_evaluator.c
+    function_definitions.c
+    grammar.c
 )
-# Ensure the generated header is created before simple_plotter is built
-add_dependencies(simple_plotter generate_font_header)
+# Ensure the generated header is created before simple_plotter_epc is built
+add_dependencies(${app} generate_font_header_epc)
+target_compile_features(${app} PRIVATE c_std_11) # Enable C11 features
+target_compile_options(${app} PRIVATE -Wall -Wextra -pedantic)
 
-
-target_link_libraries(simple_plotter PRIVATE
-    formula_parser_static
+target_link_libraries(${app} PRIVATE
+    easy_pc
     raylib
     m
 )
 
-target_include_directories(simple_plotter PRIVATE
+target_include_directories(${app} PRIVATE
     ${raygui_SOURCE_DIR}/src
     ${CMAKE_CURRENT_BINARY_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR} # For ast.h, ast_builder.h, ast_evaluator.h, function_definitions.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../../easy_pc/include # For easy_mpc.h
 )
+

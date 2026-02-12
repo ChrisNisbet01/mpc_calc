@@ -262,7 +262,6 @@ compile_expression(epc_parser_t * formula_parser, char const * input_expr)
 {
     epc_compile_context_st result = {0};
 
-    fprintf(stdout, "Parsing: \"%s\"\n", input_expr);
     result.parse_session = epc_parse_input(formula_parser, input_expr);
 
     if (!result.parse_session.result.is_error)

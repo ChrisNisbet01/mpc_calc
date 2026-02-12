@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdlib.h> // For size_t
-#include "mpc.h"
 
 // --- Custom AST Definitions (Opaque) ---
 struct FormulaAST;

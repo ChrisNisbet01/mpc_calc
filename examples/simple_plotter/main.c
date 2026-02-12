@@ -1,15 +1,21 @@
 #include "font_data.h"
-
-#include <formula_parser.h>
+#include "grammar.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> // Required for sprintf
 #include <math.h>   // Required for fabsf
+#include <stdarg.h> // Required for va_list in potential error messages.
 
 #include "raylib.h"
 #define RAYGUI_IMPLEMENTATION
 #include <raygui.h>
+
+#include "easy_pc/easy_pc.h"
+#include "ast.h"
+#include "ast_builder.h"
+#include "ast_evaluator.h"
+#include "function_definitions.h"
 
 #define INITIAL_SCREEN_WIDTH 1024
 #define INITIAL_SCREEN_HEIGHT 768
@@ -65,18 +71,13 @@ static float effectiveXRange = 0.0f; // Calculated X-axis range for display
 static float effectiveYRange = 0.0f; // Calculated Y-axis range for display
 
 // Function prototypes
-static void recalculate_graph(void);
 static Vector2 WorldToScreen(Vector2 worldPoint, Rectangle graphRect);
 static Vector2 ScreenToWorld(Vector2 screenPoint, Rectangle graphRect);
 
-
-// --- Helper Functions Implementations ---
 static void
-recalculate_graph(void)
+recalculate_graph(ast_node_t * ast, size_t num_constants, variable_t * constants)
 {
     // Cleanup previous formula and points
-    Formula * compiledFormula = formula_compile(formulaInputText);
-
     if (NULL != graphPoints)
     {
         MemFree(graphPoints);
@@ -84,27 +85,13 @@ recalculate_graph(void)
         graphPointsCount = 0;
     }
 
-    // Parse and compile new formula
-    if (NULL == compiledFormula)
-    {
-        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error compiling formula '%s'", formulaInputText);
-        return;
-    }
-    char const * const error_message = formula_get_last_error(compiledFormula);
-    if (error_message != NULL)
-    {
-        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: '%s'", error_message);
-        goto done;
-    }
-    snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
-
     effectiveXRange = xmaxVal - xminVal;
     effectiveYRange = ymaxVal - yminVal;
 
     if (effectiveXRange <= 0.0f || effectiveYRange <= 0.0f || stepVal <= 0.0f)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Invalid range or step value.");
-        goto done;
+        return;
     }
 
     // Generate graph points
@@ -115,7 +102,7 @@ recalculate_graph(void)
     if (NULL == graphPoints)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error: Not enough memory for graph points.");
-        goto done;
+        return;
     }
 
     for (int i = 0; i < estimatedPoints; ++i)
@@ -133,19 +120,20 @@ recalculate_graph(void)
             break;
         }
 
-        EvalResult eval_res = formula_evaluate(compiledFormula, current_x);
-        if (eval_res.error != EVAL_ERROR_NONE)
-        {
-            snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Error evaluating formula: %s", eval_error_to_string(eval_res.error));
-            continue;
-        }
-        double y_double = eval_res.value;
+        // XXX - Assuming that the variables list here is the same as the one
+        // used when constructing the grammar.
+        variable_t variables[1] = {
+            {
+                .name = "x",
+                .value = current_x,
+            }
+        };
 
-        float y = y_double;
+        double y =  evaluate_ast(ast, variables, 1, constants, num_constants);
 
         if (isinf(y))
         {
-            continue;
+            y = ymaxVal * 100.0;
         }
         if (isnan(y))
         {
@@ -171,7 +159,7 @@ recalculate_graph(void)
                 MemFree(graphPoints);
                 graphPoints = NULL;
                 graphPointsCount = 0;
-                goto done;
+                return;
             }
             graphPoints = newGraphPoints;
         }
@@ -185,9 +173,6 @@ recalculate_graph(void)
     {
         snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "No valid points to plot for '%s'", formulaInputText);
     }
-
-done:
-    formula_cleanup(compiledFormula);
 }
 
 
@@ -242,7 +227,7 @@ ScreenToWorld(Vector2 screenPoint, Rectangle graphRect)
 
 
 int
-main(int argc, char ** argv)
+main(void)
 {
     // Configure Window
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
@@ -253,8 +238,40 @@ main(int argc, char ** argv)
     Font font = LoadFontFromMemory(".ttf", iosevka_regular_ttf, iosevka_regular_ttf_len, FONT_SIZE, 0, 0);
     GuiSetFont(font);
 
+    variable_t constants[2] = {
+        {
+            .name = "pi",
+            .value = M_PI,
+        },
+        {
+            .name = "e",
+            .value = M_E,
+        },
+    };
+
     // Initial parsing of default formula
-    recalculate_graph(); // Use the new function
+    variable_t variables[1] = {
+        {
+            .name = "x",
+            .value = 0,
+        }
+    };
+
+    epc_parser_list * list = epc_parser_list_create();
+    epc_parser_t * formula_grammar = create_formula_grammar(list, 1, variables, 2, constants);
+    epc_compile_context_st compile_context;
+    compile_context = compile_expression(formula_grammar, formulaInputText);
+
+    if (compile_context.success && compile_context.ast != NULL)
+    {
+        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
+        recalculate_graph(compile_context.ast, 2, constants);
+    }
+    else
+    {
+        snprintf(compileStatusBuffer, sizeof(compileStatusBuffer),
+                 "Error compiling formula '%s': %s", formulaInputText, compile_context.message);
+    }
 
     /* Main game loop */
     while (!WindowShouldClose())
@@ -471,7 +488,19 @@ main(int argc, char ** argv)
 
         if (should_recalculate_graph)
         {
-            recalculate_graph();
+            compile_context_cleanup(&compile_context);
+            compile_context = compile_expression(formula_grammar, formulaInputText);
+
+            if (compile_context.success && compile_context.ast != NULL)
+            {
+                snprintf(compileStatusBuffer, sizeof(compileStatusBuffer), "Formula '%s' compiled.", formulaInputText);
+                recalculate_graph(compile_context.ast, 2, constants);
+            }
+            else
+            {
+                snprintf(compileStatusBuffer, sizeof(compileStatusBuffer),
+                         "Error compiling formula '%s': %s", formulaInputText, compile_context.message);
+            }
             drawGraphPressed = false; // Reset button state
             prevLogXScale = logXScale; // Update previous state
         }
@@ -480,6 +509,9 @@ main(int argc, char ** argv)
     }
 
     // Clean up
+    compile_context_cleanup(&compile_context);
+    epc_parser_list_free(list);
+
     if (NULL != graphPoints)
     {
         MemFree(graphPoints);
