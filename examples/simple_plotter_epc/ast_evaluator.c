@@ -2,13 +2,17 @@
 #include "ast.h"
 #include "function_definitions.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 static double
-evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var_count)
+evaluate_ast_recursive(
+    ast_node_t* node,
+    const variable_t* variables, size_t var_count,
+    const variable_t* constants, size_t const_count
+)
 {
     if (!node) {
         fprintf(stderr, "Error: NULL AST node during evaluation.\n");
@@ -22,11 +26,10 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
         case AST_NODE_TYPE_IDENTIFIER: {
             const char* name = node->data.identifier.name;
             // Check for built-in constants first
-            if (strcmp(name, "pi") == 0) {
-                return M_PI;
-            }
-            if (strcmp(name, "e") == 0) {
-                return M_E;
+            for (size_t i = 0; i < const_count; ++i) {
+                if (strcmp(name, constants[i].name) == 0) {
+                    return constants[i].value;
+                }
             }
             // Check for user-defined variables
             for (size_t i = 0; i < var_count; ++i) {
@@ -39,7 +42,8 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
         }
 
         case AST_NODE_TYPE_EXPRESSION: {
-            double left_val = evaluate_ast_recursive(node->data.expression.left, variables, var_count);
+            double left_val = evaluate_ast_recursive(
+                node->data.expression.left, variables, var_count, constants, const_count);
             if (isnan(left_val))
             {
                 return NAN;
@@ -47,7 +51,8 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
 
             char op_char = node->data.expression.operator_node->data.op.operator_char;
 
-            double right_val = evaluate_ast_recursive(node->data.expression.right, variables, var_count);
+            double right_val = evaluate_ast_recursive(
+                node->data.expression.right, variables, var_count, constants, const_count);
             if (isnan(right_val))
             {
                 return NAN;
@@ -81,7 +86,8 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
                      fprintf(stderr, "Error: Mismatch between expected and actual number of arguments for '%s'.\n", func_def->name);
                      return NAN;
                 }
-                double arg_val = evaluate_ast_recursive(current_arg_node->item, variables, var_count);
+                double arg_val = evaluate_ast_recursive(
+                    current_arg_node->item, variables, var_count, constants, const_count);
                 if (isnan(arg_val))
                 {
                     return NAN;
@@ -116,7 +122,11 @@ evaluate_ast_recursive(ast_node_t* node, const variable_t* variables, size_t var
 }
 
 double
-evaluate_ast(ast_node_t* node, const variable_t* variables, size_t var_count)
+evaluate_ast(
+    ast_node_t* node,
+    const variable_t* variables, size_t var_count,
+    const variable_t* constants, size_t const_count
+)
 {
-    return evaluate_ast_recursive(node, variables, var_count);
+    return evaluate_ast_recursive(node, variables, var_count, constants, const_count);
 }

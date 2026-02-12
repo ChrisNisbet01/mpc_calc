@@ -52,7 +52,7 @@ set_error(ast_builder_data_t * data, epc_cpt_node_t * pt_node, const char * form
 
 
 // --- Helper Functions for ast_node_t management ---
-static void
+void
 ast_node_free(ast_node_t * node)
 {
     if (node == NULL)
@@ -265,12 +265,10 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
         return;
     }
 
-    epc_ast_semantic_action_t config = epc_node_config_get(pt_node);
-
     AST_DEBUG_PRINT("[AST_BUILDER] ENTER Node: tag='%s', name='%s', content='%.*s', len=%zu, action=%d\n",
-                    pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, config.action);
+                    pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, pt_node->ast_config.action);
 
-    switch (config.action)
+    switch (pt_node->ast_config.action)
     {
     case AST_ACTION_CREATE_NUMBER_FROM_CONTENT:
     {
@@ -280,7 +278,10 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
             return;
         }
         char num_str_buf[pt_node->len + 1];
-        strncpy(num_str_buf, pt_node->content, pt_node->len);
+        strncpy(num_str_buf,
+                epc_cpt_node_get_semantic_content(pt_node),
+                epc_cpt_node_get_semantic_len(pt_node)
+        );
         num_str_buf[pt_node->len] = '\0';
         num_node->data.number.value = strtod(num_str_buf, NULL);
         ast_stack_push(data, num_node);
@@ -294,7 +295,7 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
         {
             return;
         }
-        op_node->data.op.operator_char = pt_node->content[0];
+        op_node->data.op.operator_char = epc_cpt_node_get_semantic_content(pt_node)[0];
         ast_stack_push(data, op_node);
         break;
     }
@@ -315,69 +316,6 @@ ast_builder_enter_node(epc_cpt_node_t * pt_node, void * user_data)
     }
 }
 
-
-static ast_node_t *
-build_binary_tree(ast_builder_data_t * data, ast_node_t * first_operand, ast_list_t * op_operand_pairs)
-{
-    if (data->has_error || first_operand == NULL)
-    {
-        return NULL;
-    }
-
-    ast_node_t * current_expr_node = first_operand;
-    ast_list_node_t * current_pair_node = op_operand_pairs->head;
-
-    while (current_pair_node != NULL)
-    {
-        ast_node_t * op_and_operand_list = current_pair_node->item;
-        if (op_and_operand_list == NULL
-            || op_and_operand_list->type != AST_NODE_TYPE_LIST
-            || op_and_operand_list->data.list.count != 2)
-        {
-            if (current_expr_node != first_operand)
-            {
-                ast_node_free(current_expr_node);
-            }
-            set_error(data, NULL, "Malformed op_operand_pair list item");
-            return NULL;
-        }
-
-        ast_node_t * op_node = op_and_operand_list->data.list.head->item;
-        ast_node_t * next_operand_node = op_and_operand_list->data.list.head->next->item;
-
-        if (!op_node || op_node->type != AST_NODE_TYPE_OPERATOR || !next_operand_node)
-        {
-            if (current_expr_node != first_operand)
-            {
-                ast_node_free(current_expr_node);
-            }
-            set_error(data, NULL, "Missing operator or operand in pair");
-            return NULL;
-        }
-
-        ast_node_t * new_expr_node = ast_node_alloc(data, AST_NODE_TYPE_EXPRESSION);
-        if (new_expr_node == NULL)
-        {
-            if (current_expr_node != first_operand)
-            {
-                ast_node_free(current_expr_node);
-            }
-            return NULL;
-        }
-        new_expr_node->data.expression.left = current_expr_node;
-
-        new_expr_node->data.expression.operator_node = op_node;
-        op_and_operand_list->data.list.head->item = NULL;
-
-        new_expr_node->data.expression.right = next_operand_node;
-        op_and_operand_list->data.list.head->next->item = NULL;
-
-        current_expr_node = new_expr_node;
-        current_pair_node = current_pair_node->next;
-    }
-    return current_expr_node;
-}
-
 void
 ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
 {
@@ -386,70 +324,60 @@ ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
     {
         return;
     }
-    epc_ast_semantic_action_t config = epc_node_config_get(pt_node);
 
     AST_DEBUG_PRINT("[AST_BUILDER] EXIT Node: tag='%s', name='%s', content='%.*s', len=%zu, action=%d\n",
-                    pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, config.action);
+                    pt_node->tag, pt_node->name, (int)pt_node->len, pt_node->content, pt_node->len, pt_node->ast_config.action);
 
-    switch (config.action)
+    switch (pt_node->ast_config.action)
     {
     case AST_ACTION_BUILD_BINARY_EXPRESSION:
     {
-        ast_node_t * op_operand_pairs_list_node = ast_stack_pop(data);
-        if (op_operand_pairs_list_node == NULL)
+        ast_node_t * right_operand_node = ast_stack_pop(data);
+        if (right_operand_node == NULL)
         {
             return;
         }
-        ast_node_t * initial_operand_node = ast_stack_pop(data);
-        if (initial_operand_node == NULL)
+        ast_node_t * operator_node = ast_stack_pop(data);
+        if (operator_node == NULL || operator_node->type != AST_NODE_TYPE_OPERATOR)
         {
-            ast_node_free(op_operand_pairs_list_node);
+            ast_node_free(right_operand_node);
+            set_error(data, pt_node, "Expected operator node for binary expression");
+            return;
+        }
+        ast_node_t * left_operand_node = ast_stack_pop(data);
+        if (left_operand_node == NULL)
+        {
+            ast_node_free(right_operand_node);
+            ast_node_free(operator_node);
             return;
         }
         ast_node_t * own_placeholder = ast_stack_pop(data);
 
         if (own_placeholder == NULL || !is_placeholder_node(own_placeholder))
         {
-            set_error(data, pt_node, "Internal error: bad placeholder for BUILD_BINARY_EXPRESSION");
-            ast_node_free(op_operand_pairs_list_node);
-            ast_node_free(initial_operand_node);
+            ast_node_free(right_operand_node);
+            ast_node_free(operator_node);
+            ast_node_free(left_operand_node);
             ast_node_free(own_placeholder);
+            set_error(data, pt_node, "Internal error: bad placeholder for BUILD_BINARY_EXPRESSION");
+            return;
+        }
+        ast_node_free(own_placeholder);
+
+        ast_node_t * expression_node = ast_node_alloc(data, AST_NODE_TYPE_EXPRESSION);
+        if (expression_node == NULL)
+        {
+            ast_node_free(right_operand_node);
+            ast_node_free(operator_node);
+            ast_node_free(left_operand_node);
             return;
         }
 
-        ast_node_free(own_placeholder);
+        expression_node->data.expression.left = left_operand_node;
+        expression_node->data.expression.operator_node = operator_node;
+        expression_node->data.expression.right = right_operand_node;
 
-        ast_node_t * final_expression_node;
-
-        if (op_operand_pairs_list_node
-            && op_operand_pairs_list_node->type == AST_NODE_TYPE_LIST
-            && op_operand_pairs_list_node->data.list.count > 0)
-        {
-            final_expression_node = build_binary_tree(
-                data,
-                initial_operand_node,
-                &op_operand_pairs_list_node->data.list
-            );
-        }
-        else
-        {
-            final_expression_node = initial_operand_node;
-        }
-
-        if (final_expression_node != NULL)
-        {
-            ast_stack_push(data, final_expression_node);
-            ast_node_free(op_operand_pairs_list_node);
-        }
-        else
-        {
-            ast_node_free(initial_operand_node);
-            ast_node_free(op_operand_pairs_list_node);
-            if (!data->has_error)
-            {
-                set_error(data, pt_node, "Failed to build binary expression");
-            }
-        }
+        ast_stack_push(data, expression_node);
         break;
     }
 
@@ -653,7 +581,11 @@ ast_builder_exit_node(epc_cpt_node_t * pt_node, void * user_data)
         {
             return;
         }
-        ident_node->data.identifier.name = strndup(pt_node->content, pt_node->len);
+        ident_node->data.identifier.name =
+            strndup(
+                epc_cpt_node_get_semantic_content(pt_node),
+                epc_cpt_node_get_semantic_len(pt_node)
+            );
         ast_stack_push(data, ident_node);
         break;
     }

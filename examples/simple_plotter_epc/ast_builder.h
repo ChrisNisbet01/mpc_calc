@@ -45,3 +45,9 @@ ast_builder_init(ast_builder_data_t* data);
 // Function to clean up the AST builder data after an evaulation
 void
 ast_builder_cleanup(ast_builder_data_t * data);
+
+
+// Function to free the root AST node returned after building the AST tree
+void
+ast_node_free(ast_node_t * node);
+

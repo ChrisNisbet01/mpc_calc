@@ -41,6 +41,7 @@ add_executable(simple_plotter_epc
     ast_builder.c
     ast_evaluator.c
     function_definitions.c
+    grammar.c
 )
 # Ensure the generated header is created before simple_plotter_epc is built
 add_dependencies(simple_plotter_epc generate_font_header_epc)
